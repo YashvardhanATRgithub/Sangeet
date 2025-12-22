@@ -42,6 +42,32 @@ Since this app is not signed with a $99 Apple Developer account, macOS may block
 - **MediaPlayer**: For system-level integration.
 - **CoreData**: For robust metadata and playlist persistence.
 
+## 🧑‍💻 Development
+
+Want to build it yourself?
+
+1. **Clone the repo**
+   ```bash
+   git clone https://github.com/YashvardhanATRgithub/Sangeet.git
+   cd Sangeet
+   ```
+
+2. **Open in Xcode**
+   Double-click `Sangeet.xcodeproj`.
+
+3. **Build the App**
+   - Select the **Sangeet** scheme.
+   - Press `Cmd + B` to build.
+   - To run, press `Cmd + R`.
+
+4. **Create DMG Installer** (Optional)
+   If you want to package the app for distribution:
+   ```bash
+   # First, build for Release in Xcode
+   # Then run the script:
+   ./create_dmg.sh /path/to/your/Sangeet.app
+   ```
+
 ## 📝 License
 
 This project is open-source and available under the MIT License.
