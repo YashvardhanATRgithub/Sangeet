@@ -26,6 +26,15 @@ A stunning, native macOS music player building with SwiftUI, designed for audiop
 2. Download the latest `Sangeet.dmg`.
 3. Open the `.dmg` and drag **Sangeet** to your Applications folder.
 
+### ⚠️ "App cannot be opened" Error?
+
+Since this app is not signed with a $99 Apple Developer account, macOS may block it by default. To open it:
+
+1. **Right-click** (or Control-click) the Sangeet app icon.
+2. Select **Open** from the menu.
+3. Click **Open** in the dialog box that appears.
+*(You only need to do this once)*.
+
 ## 🛠️ Built With
 
 - **Swift** & **SwiftUI**
