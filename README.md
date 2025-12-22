@@ -3,7 +3,7 @@
 
 A stunning, native macOS music player building with SwiftUI, designed for audiophiles who value aesthetics and performance.
 
-![Sangeet Banner](docs/banner.png)
+![Sangeet Screenshot](docs/app_screenshot.png)
 
 ## ✨ Features
 
