@@ -79,23 +79,25 @@ struct QueueView: View {
                 Spacer()
                 
                 // Autoplay
-                Button(action: { }) {
+                Button(action: { playback.isAutoplayEnabled.toggle() }) {
                     HStack(spacing: 6) {
                         Text("Autoplay")
                             .font(.system(size: 12))
                         Image(systemName: "infinity")
                             .font(.system(size: 12))
                     }
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(playback.isAutoplayEnabled ? Theme.accent : .secondary)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(Color.white.opacity(0.05))
+                    .background(
+                        (playback.isAutoplayEnabled ? Theme.accent : Color.white).opacity(0.1)
+                    )
                     .cornerRadius(6)
                 }
                 .buttonStyle(.plain)
                 
                 // Clear
-                Button(action: { }) {
+                Button(action: { playback.clearUpcomingTracks() }) {
                     Image(systemName: "trash")
                         .font(.system(size: 14))
                         .foregroundStyle(.secondary)

@@ -170,7 +170,26 @@ extension PlaybackController {
         shuffledIndices.removeAll()
         shufflePlayedIndices.removeAll()
         
-        // Clear gapless state
+        nextTrack = nil
+        isNextTrackPreloaded = false
+        audioEngine.clearPreloadedTrack()
+    }
+    
+    /// Clears only the upcoming tracks (context queue), keeping the current track playing.
+    func clearUpcomingTracks() {
+        guard currentQueueIndex >= 0 && currentQueueIndex < queue.count else {
+            // Nothing playing or invalid index, might as well clear all
+            clearQueue()
+            return
+        }
+        
+        // Keep everything up to (and including) current index
+        let keepCount = currentQueueIndex + 1
+        if keepCount < queue.count {
+            queue = Array(queue.prefix(keepCount))
+        }
+        
+        // Clear gapless state since next track is gone
         nextTrack = nil
         isNextTrackPreloaded = false
         audioEngine.clearPreloadedTrack()

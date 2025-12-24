@@ -77,7 +77,7 @@ struct NowPlayingBar: View {
                         }
                     }
                 }
-                .frame(width: 400, alignment: .leading)
+                .frame(width: 480, alignment: .leading)
                 .contentShape(Rectangle())
                 .onTapGesture { showFullScreen = true }
                 
@@ -266,7 +266,7 @@ struct NowPlayingBar: View {
                     .buttonStyle(.plain)
                     .hoverEffect()
                 }
-                .frame(width: 400, alignment: .trailing)
+                .frame(width: 480, alignment: .trailing)
             }
             .padding(.horizontal, 24)
             .padding(.vertical, 16)
