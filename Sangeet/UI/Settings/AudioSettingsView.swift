@@ -70,25 +70,25 @@ struct AudioSettingsView: View {
                     get: { effectsManager.isReverbEnabled },
                     set: { effectsManager.setReverbEnabled($0) }
                 ))
-                .toggleStyle(.switch)
+                .toggleStyle(.modern)
             }
             
             // Reverb Mix
             if effectsManager.isReverbEnabled {
-            settingRow(
+                settingRow(
                     label: "Reverb Mix",
                     description: "Amount of reverb effect to apply"
-            ) {
-                HStack(spacing: 8) {
-                        Slider(value: Binding(
+                ) {
+                    HStack(spacing: 8) {
+                        ModernSlider(value: Binding(
                             get: { Double(effectsManager.reverbMix) },
                             set: { effectsManager.setReverbMix(Float($0)) }
-                        ), in: -96...0, step: 1)
+                        ), range: -96...0, step: 1.0)
                         .frame(width: 150)
                     
                         Text("\(Int(effectsManager.reverbMix)) dB")
                             .frame(width: 60, alignment: .trailing)
-                        .foregroundColor(.secondary)
+                            .foregroundColor(.secondary)
                             .monospacedDigit()
                     }
                 }
@@ -104,7 +104,7 @@ struct AudioSettingsView: View {
                 description: "Automatically normalize volume across tracks"
             ) {
                 Toggle("", isOn: $replayGainSettings.isEnabled)
-                    .toggleStyle(.switch)
+                    .toggleStyle(.modern)
             }
             
             // Mode & Source Pickers
@@ -194,10 +194,10 @@ struct AudioSettingsView: View {
                 description: "Larger buffer = more stable, but higher latency"
             ) {
                 HStack(spacing: 8) {
-                    Slider(value: Binding(
+                    ModernSlider(value: Binding(
                         get: { Double(settings.bufferLength) },
                         set: { settings.bufferLength = Int($0) }
-                    ), in: 100...2000, step: 100)
+                    ), range: 100...2000, step: 100.0)
                     .frame(width: 150)
                     
                     Text("\(settings.bufferLength) ms")
@@ -212,11 +212,11 @@ struct AudioSettingsView: View {
         VStack(alignment: .leading, spacing: 16) {
             // Synchronize Sample Rate
             settingRow(
-                label: "Synchronize Sample Rate with Music Player (Hog mode)",
+                label: "Synchronize Sample Rate (Hog mode)",
                 description: "Enable exclusive audio access for bit-perfect playback"
             ) {
                 Toggle("", isOn: $settings.synchronizeSampleRate)
-                    .toggleStyle(.switch)
+                    .toggleStyle(.modern)
             }
             
             // Info text when enabled

@@ -53,7 +53,13 @@ struct AdvancedSettingsView: View {
                 }
                 .font(.subheadline)
                 
-                Slider(value: $cacheSize, in: 100...1000, step: 100)
+                HStack {
+                    ModernSlider(value: $cacheSize, range: 100...1000, step: 100)
+                    Text("\(Int(cacheSize)) MB")
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .frame(width: 70, alignment: .trailing)
+                }
                     .onChange(of: cacheSize) { newValue in
                         applyCacheSize(Int(newValue))
                     }

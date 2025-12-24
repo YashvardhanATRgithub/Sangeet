@@ -71,7 +71,7 @@ struct MainView: View {
                  }
                  .buttonStyle(.plain)
                  
-                 Button(action: { showingLibrarySettings = true }) {
+                 Button(action: { withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { showingLibrarySettings = true } }) {
                      Image(systemName: "gearshape")
                         .font(.system(size: 18))
                         .foregroundStyle(.secondary)
@@ -176,7 +176,9 @@ struct MainView: View {
                     showLyricsInFullScreen = true
                 },
                 onOpenEqualizer: {
-                    showingEqualizer = true
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        showingEqualizer = true
+                    }
                 }
             )
             .offset(y: showFullScreenPlayer ? 150 : 0) // Slide down
@@ -221,35 +223,20 @@ struct MainView: View {
                 ZStack {
                     Color.black.opacity(0.4)
                         .ignoresSafeArea()
+                        .transition(.opacity.animation(.easeOut(duration: 0.25)))
                         .onTapGesture {
-                            withAnimation(.easeInOut(duration: 0.2)) {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
                                 showingLibrarySettings = false
                             }
                         }
                     
-                    SettingsView()
+                    SettingsView(isPresented: $showingLibrarySettings)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .shadow(color: Color.black.opacity(0.3), radius: 20, x: 0, y: 10)
-                        .overlay(
-                            Button(action: { 
-                                withAnimation(.easeInOut(duration: 0.2)) {
-                                    showingLibrarySettings = false 
-                                }
-                            }) {
-                                 Image(systemName: "xmark.circle.fill")
-                                     .font(.system(size: 22))
-                                     .foregroundStyle(.secondary)
-                                     .background(Circle().fill(Theme.background).padding(2))
-                            }
-                            .buttonStyle(.plain)
-                            .padding(12),
-                            alignment: .topTrailing
-                        )
-                        .transition(.scale(scale: 0.95).combined(with: .opacity))
+                        .transition(.scale(scale: 0.9).combined(with: .opacity))
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .zIndex(100)
-                .transition(.opacity)
             }
             
             // Layer 6: Equalizer Modal
@@ -257,36 +244,20 @@ struct MainView: View {
                 ZStack {
                     Color.black.opacity(0.4)
                         .ignoresSafeArea()
+                        .transition(.opacity.animation(.easeOut(duration: 0.25)))
                         .onTapGesture {
-                            withAnimation(.easeInOut(duration: 0.2)) {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
                                 showingEqualizer = false
                             }
                         }
                     
-                    EqualizerView()
-                        .frame(width: 750, height: 500)
+                    EqualizerView(isPresented: $showingEqualizer)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .shadow(color: Color.black.opacity(0.3), radius: 20, x: 0, y: 10)
-                        .overlay(
-                            Button(action: { 
-                                withAnimation(.easeInOut(duration: 0.2)) {
-                                    showingEqualizer = false 
-                                }
-                            }) {
-                                 Image(systemName: "xmark.circle.fill")
-                                     .font(.system(size: 22))
-                                     .foregroundStyle(.secondary)
-                                     .background(Circle().fill(Theme.background).padding(2))
-                            }
-                            .buttonStyle(.plain)
-                            .padding(12),
-                            alignment: .topTrailing
-                        )
-                        .transition(.scale(scale: 0.95).combined(with: .opacity))
+                        .transition(.scale(scale: 0.9).combined(with: .opacity))
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .zIndex(100)
-                .transition(.opacity)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

@@ -41,6 +41,16 @@ struct SidebarView: View {
                     
                     ForEach(playlists.playlists) { playlist in
                         sidebarItem(title: playlist.name, icon: "music.note.list", selection: .playlist(playlist.id))
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    if selection == .playlist(playlist.id) {
+                                        selection = .songs
+                                    }
+                                    playlists.delete(id: playlist.id)
+                                } label: {
+                                    Label("Delete Playlist", systemImage: "trash")
+                                }
+                            }
                     }
                 }
             }

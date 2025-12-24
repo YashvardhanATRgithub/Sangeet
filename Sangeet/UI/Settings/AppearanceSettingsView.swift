@@ -70,7 +70,7 @@ struct AppearanceSettingsView: View {
                         .foregroundColor(.secondary)
                 }
                 
-                Slider(value: $accentOpacity, in: 0.5...1.0, step: 0.1)
+                ModernSlider(value: $accentOpacity, range: 0.5...1.0, step: 0.1)
                     .accentColor(theme.currentTheme.primaryColor)
             }
         }

@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct SettingsView: View {
+    @Binding var isPresented: Bool
+    @ObservedObject var theme = AppTheme.shared
     @State private var selectedTab: SettingsTab = .appearance
     
     enum SettingsTab: String, CaseIterable, Identifiable {
@@ -29,67 +31,101 @@ struct SettingsView: View {
             case .audio: return "speaker.wave.3.fill"
             case .advanced: return "gearshape.2.fill"
             case .about: return "info.circle.fill"
+            case .about: return "info.circle.fill"
             }
         }
     }
     
     var body: some View {
-        HStack(spacing: 0) {
-            // Sidebar
-            VStack(alignment: .leading, spacing: 10) {
+        VStack(spacing: 0) {
+            // Window Header
+            HStack {
                 Text("Settings")
                     .font(.headline)
-                    .padding(.horizontal)
-                    .padding(.top, 16)
-                    .padding(.bottom, 8)
-                
-                ForEach(SettingsTab.allCases) { tab in
-                    SettingsSidebarButton(
-                        tab: tab,
-                        isSelected: selectedTab == tab
-                    ) {
-                        selectedTab = tab
-                    }
-                }
-                
+                    .foregroundStyle(.primary)
                 Spacer()
+                
+                Button(action: { isPresented = false }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 20)) // Slightly larger target
+                        .foregroundStyle(.secondary)
+                        .padding(4)
+                }
+                .buttonStyle(.plain)
             }
-            .frame(width: 200)
-            .background(Color(nsColor: .controlBackgroundColor))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color(nsColor: .controlBackgroundColor)) // Matches sidebar usually
             
-            Divider()
+            // Themed Separator
+            Rectangle()
+                .fill(theme.currentTheme.primaryColor)
+                .frame(height: 1)
+                .edgesIgnoringSafeArea(.horizontal)
             
-            // Content
-            VStack {
-                switch selectedTab {
-                case .appearance:
+            HStack(spacing: 0) {
+                // Sidebar
+                VStack(alignment: .leading, spacing: 10) {
                     ScrollView {
-                        AppearanceSettingsView()
-                            .padding()
-                    }
-                case .library:
-                    LibrarySettingsView()
-                case .audio:
-                    ScrollView {
-                        AudioSettingsView()
-                            .padding()
-                    }
-                case .advanced:
-                    ScrollView {
-                        AdvancedSettingsView()
-                            .padding()
-                    }
-                case .about:
-                    ScrollView {
-                        AboutSettingsView()
-                            .padding()
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(SettingsTab.allCases) { tab in
+                                SettingsSidebarButton(
+                                    tab: tab,
+                                    isSelected: selectedTab == tab
+                                ) {
+                                    selectedTab = tab
+                                }
+                            }
+                        }
+                        .padding(.top, 12)
                     }
                 }
+                .frame(width: 200)
+                .background(Color(nsColor: .controlBackgroundColor))
+                
+                // Vertical Themed Separator
+                Rectangle()
+                    .fill(theme.currentTheme.primaryColor) // Solid themed color
+                    .frame(width: 1)
+                    .edgesIgnoringSafeArea(.vertical)
+                
+                // Content
+                VStack {
+                    switch selectedTab {
+                    case .appearance:
+                        ScrollView {
+                            AppearanceSettingsView()
+                                .padding()
+                        }
+                    case .library:
+                        LibrarySettingsView()
+                    case .audio:
+                        ScrollView {
+                            AudioSettingsView()
+                                .padding()
+                        }
+                    case .advanced:
+                        ScrollView {
+                            AdvancedSettingsView()
+                                .padding()
+                        }
+                    case .about:
+                        ScrollView {
+                            AboutSettingsView()
+                                .padding()
+                        }
+                    }
+                }
+                .frame(minWidth: 500, maxWidth: .infinity, maxHeight: .infinity)
+                .background(Theme.background)
             }
-            .frame(minWidth: 500, maxWidth: .infinity, maxHeight: .infinity)
-            .background(Theme.background)
         }
         .frame(width: 750, height: 500)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(theme.currentTheme.primaryColor, lineWidth: 2) // Outer Themed Border
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 
@@ -98,6 +134,7 @@ private struct SettingsSidebarButton: View {
     let isSelected: Bool
     let action: () -> Void
     
+    @ObservedObject var theme = AppTheme.shared
     @State private var isHovered = false
     
     var body: some View {
@@ -106,7 +143,7 @@ private struct SettingsSidebarButton: View {
                 Image(systemName: tab.icon)
                     .font(.system(size: 14))
                     .frame(width: 20)
-                    .foregroundStyle(isSelected ? Theme.accent : .secondary)
+                    .foregroundStyle(isSelected ? theme.currentTheme.primaryColor : .secondary)
                 
                 Text(tab.title)
                     .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
@@ -118,7 +155,7 @@ private struct SettingsSidebarButton: View {
             .padding(.vertical, 6)
             .background(
                 RoundedRectangle(cornerRadius: 6)
-                    .fill(isSelected ? Theme.accent.opacity(0.1) : (isHovered ? Color.secondary.opacity(0.05) : Color.clear))
+                    .fill(isSelected ? theme.currentTheme.primaryColor.opacity(0.1) : (isHovered ? Color.secondary.opacity(0.05) : Color.clear))
             )
         }
         .buttonStyle(.plain)

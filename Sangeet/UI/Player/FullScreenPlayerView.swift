@@ -3,10 +3,23 @@ import SwiftUI
 struct FullScreenPlayerView: View {
     @Binding var isPresented: Bool
     @ObservedObject var playback: PlaybackController
+    @ObservedObject var theme = AppTheme.shared
     @State private var showQueue = false
     @Binding var showLyrics: Bool
     @State private var isHoveringVolume: Bool = false
     @ObservedObject var effects = AudioEffectsManager.shared
+    
+    private var volumeIconName: String {
+        if playback.isMuted || playback.volume == 0 {
+            return "speaker.slash.fill"
+        } else if playback.volume < 0.33 {
+            return "speaker.wave.1.fill"
+        } else if playback.volume < 0.66 {
+            return "speaker.wave.2.fill"
+        } else {
+            return "speaker.wave.3.fill"
+        }
+    }
     
     var body: some View {
         ZStack {
@@ -145,7 +158,7 @@ struct FullScreenPlayerView: View {
                         Button(action: { playback.previous() }) {
                             Image(systemName: "backward.fill")
                                 .font(.system(size: 32, weight: .semibold))
-                                .foregroundStyle(.white.opacity(0.7))
+                                .foregroundStyle(theme.currentTheme.primaryColor.opacity(0.9))
                         }
                         .buttonStyle(.plain)
                         .hoverEffect(scale: 1.1)
@@ -153,14 +166,14 @@ struct FullScreenPlayerView: View {
                         Button(action: { playback.togglePlayPause() }) {
                             ZStack {
                                 Circle()
-                                    .fill(.white)
+                                    .fill(theme.currentTheme.primaryColor)
                                     .frame(width: 80, height: 80)
-                                    .shadow(color: .white.opacity(0.2), radius: 20, x: 0, y: 0)
+                                    .shadow(color: theme.currentTheme.primaryColor.opacity(0.4), radius: 20, x: 0, y: 0)
                                     .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
                                 
                                 Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
                                     .font(.system(size: 32, weight: .black))
-                                    .foregroundStyle(.black)
+                                    .foregroundStyle(.white)
                                     // Slight offset for visual center of 'play' triangle
                                     .offset(x: playback.isPlaying ? 0 : 3)
                             }
@@ -173,7 +186,7 @@ struct FullScreenPlayerView: View {
                         Button(action: { playback.next() }) {
                             Image(systemName: "forward.fill")
                                 .font(.system(size: 32, weight: .semibold))
-                                .foregroundStyle(.white.opacity(0.7))
+                                .foregroundStyle(theme.currentTheme.primaryColor.opacity(0.9))
                         }
                         .buttonStyle(.plain)
                         .hoverEffect(scale: 1.1)
@@ -183,30 +196,35 @@ struct FullScreenPlayerView: View {
                     // Volume Slider (Sleek)
                     HStack(spacing: 16) {
                         Button(action: { playback.toggleMute() }) {
-                            Image(systemName: playback.volume == 0 ? "speaker.slash.fill" : "speaker.fill")
+                            Image(systemName: volumeIconName)
                                 .font(.body)
-                                .foregroundStyle(.white.opacity(0.7))
+                                .foregroundStyle(playback.isMuted ? .red.opacity(0.8) : .white.opacity(0.7))
                         }
                         .buttonStyle(.plain)
                         .hoverEffect()
                             
                         GeometryReader { geo in
                             let w = geo.size.width
+                            let h = geo.size.height
                             ZStack(alignment: .leading) {
                                 Capsule()
                                     .fill(.white.opacity(0.1))
                                     .frame(height: isHoveringVolume ? 10 : 5)
                                 
                                 Capsule()
-                                    .fill(.white.opacity(0.8))
-                                    .frame(width: w * CGFloat(playback.volume), height: isHoveringVolume ? 10 : 5)
+                                    .fill(playback.isMuted ? .secondary : theme.currentTheme.primaryColor.opacity(0.9))
+                                    .frame(width: w * CGFloat(playback.isMuted ? 0 : playback.volume), height: isHoveringVolume ? 10 : 5)
                             }
+                            .frame(width: w, height: h, alignment: .center)
                             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHoveringVolume)
                             .contentShape(Rectangle())
                             .gesture(
                                 DragGesture(minimumDistance: 0).onChanged { v in
                                     let p = min(max(0, v.location.x / w), 1)
                                     playback.volume = Double(p)
+                                    if playback.isMuted && p > 0 {
+                                        playback.toggleMute() // Auto-unmute when adjusting volume
+                                    }
                                 }
                             )
                         }

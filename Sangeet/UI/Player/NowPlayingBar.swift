@@ -16,6 +16,18 @@ struct NowPlayingBar: View {
         self.onOpenEqualizer = onOpenEqualizer
     }
     
+    private var volumeIconName: String {
+        if playback.isMuted || playback.volume == 0 {
+            return "speaker.slash.fill"
+        } else if playback.volume < 0.33 {
+            return "speaker.wave.1.fill"
+        } else if playback.volume < 0.66 {
+            return "speaker.wave.2.fill"
+        } else {
+            return "speaker.wave.3.fill"
+        }
+    }
+    
     // ...
     
     var body: some View {
@@ -185,30 +197,35 @@ struct NowPlayingBar: View {
                     // Volume
                     HStack(spacing: 12) {
                         Button(action: { playback.toggleMute() }) {
-                            Image(systemName: playback.volume == 0 ? "speaker.slash.fill" : "speaker.fill")
+                            Image(systemName: volumeIconName)
                                 .font(.system(size: 14))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(playback.isMuted ? .red.opacity(0.8) : .secondary)
                         }
                         .buttonStyle(.plain)
                         .hoverEffect()
                         
                         GeometryReader { geo in
                             let w = geo.size.width
+                            let h = geo.size.height
                             ZStack(alignment: .leading) {
                                 Capsule()
                                     .fill(.white.opacity(0.1))
                                     .frame(height: isHoveringVolume ? 8 : 4)
                                 
                                 Capsule()
-                                    .fill(theme.currentTheme.primaryColor) // Use theme accent here for visibility on dark bar
-                                    .frame(width: w * CGFloat(playback.volume), height: isHoveringVolume ? 8 : 4)
+                                    .fill(playback.isMuted ? .secondary : theme.currentTheme.primaryColor)
+                                    .frame(width: w * CGFloat(playback.isMuted ? 0 : playback.volume), height: isHoveringVolume ? 8 : 4)
                             }
+                            .frame(width: w, height: h, alignment: .center)
                             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHoveringVolume)
                             .contentShape(Rectangle())
                             .gesture(
                                 DragGesture(minimumDistance: 0).onChanged { v in
                                     let p = min(max(0, v.location.x / w), 1)
                                     playback.volume = Double(p)
+                                    if playback.isMuted && p > 0 {
+                                        playback.toggleMute() // Auto-unmute when adjusting volume
+                                    }
                                 }
                             )
                         }

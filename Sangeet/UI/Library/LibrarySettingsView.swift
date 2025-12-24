@@ -5,42 +5,73 @@ struct LibrarySettingsView: View {
     @State private var folders: [URL] = []
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Library Folders")
-                .font(.headline)
+        VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Library Folders")
+                    .font(.title2.bold())
+                Text("Manage where Sangeet looks for your music.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal)
+            .padding(.top)
             
             List {
                 ForEach(folders, id: \.self) { url in
                     HStack {
-                        Image(systemName: "folder")
+                        Image(systemName: "folder.fill")
                             .foregroundStyle(Theme.accent)
-                        Text(url.lastPathComponent)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
+                            .font(.title3)
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(url.lastPathComponent)
+                                .font(.body.weight(.medium))
+                            Text(url.path)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                        
                         Spacer()
                         
                         Button {
                             removeFolder(url)
                         } label: {
                             Image(systemName: "trash")
-                                .foregroundStyle(.red)
+                                .foregroundStyle(.secondary) // Subtle default
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                        .hoverEffect()
                     }
-                    .padding(.vertical, 4)
+                    .padding(.vertical, 8)
                 }
             }
-            .frame(height: 200)
-            .listStyle(.plain)
+            .listStyle(.inset)
+            .scrollContentBackground(.hidden)
+            .background(Color.black.opacity(0.03))
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+            )
             .overlay(folders.isEmpty ? Text("No folders added").foregroundStyle(.secondary) : nil)
+            .frame(height: 300) // Taller list
+            .padding(.horizontal)
             
             HStack {
-                Button("Add Folder") {
-                    importFolder()
+                Button(action: { importFolder() }) {
+                    Label("Add Folder", systemImage: "plus.circle.fill")
+                        .padding(.horizontal, 8)
                 }
+                .buttonStyle(.borderedProminent)
+                .tint(Theme.accent)
+                .controlSize(.large)
+                
                 Spacer()
+                
                 Button("Clear All") {
-                    // Not implemented in DB manager yet efficiently, doing loop
                     let allFolders = services.database.getAllFolders()
                     Task {
                         for folder in allFolders {
@@ -49,11 +80,16 @@ struct LibrarySettingsView: View {
                         await MainActor.run { refresh() }
                     }
                 }
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.red)
+                .buttonStyle(.plain)
+                .opacity(folders.isEmpty ? 0.5 : 1)
+                .disabled(folders.isEmpty)
             }
+            .padding(.horizontal)
+            .padding(.bottom)
         }
-        .padding()
-        .frame(width: 350)
+        .frame(width: 550) // Signficantly wider
+        .background(Theme.background)
         .onAppear {
             refresh()
         }

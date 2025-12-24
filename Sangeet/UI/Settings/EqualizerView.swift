@@ -1,7 +1,9 @@
 import SwiftUI
 
 struct EqualizerView: View {
+    @Binding var isPresented: Bool
     @ObservedObject var effectsManager = AudioEffectsManager.shared
+    @ObservedObject var theme = AppTheme.shared
     @State private var showSavePresetDialog = false
     @State private var newPresetName = ""
     @State private var showAlert = false
@@ -22,28 +24,80 @@ struct EqualizerView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Control Bar
-            controlBar
-                .padding(.horizontal, 24)
-                .padding(.vertical, 16)
-            
-            Divider()
-            
-            if effectsManager.isEqualizerEnabled {
-                equalizerContent
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 32)
-            } else {
-                disabledState
+            // Window Header (Matches SettingsView)
+            HStack {
+                Text("Equalizer")
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                Spacer()
+                
+                Button(action: { isPresented = false }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.secondary)
+                        .padding(4)
+                }
+                .buttonStyle(.plain)
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color(nsColor: .controlBackgroundColor))
+            
+            // Themed Separator
+            Rectangle()
+                .fill(theme.currentTheme.primaryColor)
+                .frame(height: 1)
+                .edgesIgnoringSafeArea(.horizontal)
+            
+            // Main Content Area (HiFidelity style)
+            VStack(spacing: 0) {
+                // Control bar
+                controlBar
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 16)
+                
+                Divider()
+                
+                if effectsManager.isEqualizerEnabled {
+                    // Equalizer sliders
+                    equalizerContent
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 32)
+                } else {
+                    // Disabled state
+                    disabledState
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Theme.background)
         }
-        .frame(minWidth: 600, minHeight: 500)
-        .background(Theme.background)
+        .frame(width: 800, height: 500)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(theme.currentTheme.primaryColor, lineWidth: 2)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .sheet(isPresented: $showSavePresetDialog) {
             savePresetDialog
         }
         .alert(isPresented: $showAlert) {
             Alert(title: Text("Preset Manager"), message: Text(alertMessage), dismissButton: .default(Text("OK")))
+        }
+        .alert(isPresented: $showDeleteConfirmation) {
+            Alert(
+                title: Text("Delete Preset"),
+                message: Text("Are you sure you want to delete '\(presetToDelete?.name ?? "")'?"),
+                primaryButton: .destructive(Text("Delete")) {
+                    if let preset = presetToDelete {
+                        effectsManager.deleteCustomPreset(preset)
+                        alertMessage = "Preset '\(preset.name)' deleted"
+                        showAlert = true
+                    }
+                    presetToDelete = nil
+                },
+                secondaryButton: .cancel()
+            )
         }
     }
     
@@ -94,7 +148,7 @@ struct EqualizerView: View {
     // MARK: - Control Bar
     private var controlBar: some View {
         HStack(spacing: 20) {
-            // Power Switch
+            // Power switch
             HStack(spacing: 8) {
                 Text("Power")
                     .font(.system(size: 13, weight: .medium))
@@ -108,8 +162,9 @@ struct EqualizerView: View {
                     }
             }
             
-            // Actions
+            // Quick actions and status
             HStack(spacing: 12) {
+                // Custom mode indicator
                 if isCustomMode && effectsManager.isEqualizerEnabled {
                     HStack(spacing: 6) {
                         Image(systemName: "hand.draw.fill")
@@ -117,15 +172,16 @@ struct EqualizerView: View {
                         Text("Custom")
                             .font(.system(size: 12, weight: .semibold))
                     }
-                    .foregroundColor(Theme.accent)
+                    .foregroundColor(theme.currentTheme.primaryColor)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
                     .background(
                         Capsule()
-                            .fill(Theme.accent.opacity(0.15))
+                            .fill(theme.currentTheme.primaryColor.opacity(0.15))
                     )
                 }
                 
+                // Save Custom Preset button
                 Button(action: {
                     showSavePresetDialog = true
                     newPresetName = ""
@@ -135,15 +191,15 @@ struct EqualizerView: View {
                 }
                 .buttonStyle(.bordered)
                 .disabled(!effectsManager.isEqualizerEnabled)
+                .help("Save current equalizer settings as a custom preset")
                 
+                // Delete Current Preset button (only shown for custom presets)
                 if effectsManager.currentPresetType == .custom {
                     Button(action: {
-                         if let preset = effectsManager.customPresets.first(where: { $0.name == effectsManager.currentPresetName }) {
-                            // Simple delete processing
-                            effectsManager.deleteCustomPreset(preset)
-                            alertMessage = "Preset '\(preset.name)' deleted"
-                            showAlert = true
-                         }
+                        if let preset = effectsManager.customPresets.first(where: { $0.name == effectsManager.currentPresetName }) {
+                            presetToDelete = preset
+                            showDeleteConfirmation = true
+                        }
                     }) {
                         Label("Delete Preset", systemImage: "trash")
                             .font(.system(size: 13))
@@ -151,47 +207,68 @@ struct EqualizerView: View {
                     .buttonStyle(.bordered)
                     .foregroundColor(.red)
                     .disabled(!effectsManager.isEqualizerEnabled)
+                    .help("Delete the current custom preset")
                 }
                 
-                Button(action: { effectsManager.resetEqualizer() }) {
+                Button(action: {
+                    effectsManager.resetEqualizer()
+                }) {
                     Label("Reset All", systemImage: "arrow.counterclockwise")
                         .font(.system(size: 13))
                 }
                 .buttonStyle(.bordered)
                 .disabled(!effectsManager.isEqualizerEnabled)
+                .help("Reset preamp and all EQ bands to 0 dB")
             }
             
             Spacer()
             
-            // Preset Selector
+            // Preset selector
             HStack(spacing: 8) {
                 Text("Preset")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(.secondary)
                 
                 Menu {
+                    // Built-in presets
                     ForEach(EQPreset.allCases) { preset in
-                        Button(action: { applyEQPreset(preset) }) {
+                        Button(action: {
+                            applyEQPreset(preset)
+                        }) {
                             HStack {
                                 Text(preset.name)
-                                if effectsManager.currentPresetType == .builtin && effectsManager.currentPresetName == preset.name {
+                                if effectsManager.currentPresetType == .builtin &&
+                                   effectsManager.currentPresetName == preset.name {
                                     Image(systemName: "checkmark")
                                 }
                             }
                         }
                     }
                     
+                    // Custom presets section
                     if !effectsManager.customPresets.isEmpty {
                         Divider()
+                        
                         Section(header: Text("My Presets")) {
                             ForEach(effectsManager.customPresets) { preset in
-                                Button(action: { applyCustomPreset(preset) }) {
+                                Button(action: {
+                                    applyCustomPreset(preset)
+                                }) {
                                     HStack {
                                         Text(preset.name)
-                                        if effectsManager.currentPresetType == .custom && effectsManager.currentPresetName == preset.name {
+                                        if effectsManager.currentPresetType == .custom &&
+                                           effectsManager.currentPresetName == preset.name {
                                             Spacer()
                                             Image(systemName: "checkmark")
                                         }
+                                    }
+                                }
+                                .contextMenu {
+                                    Button(role: .destructive, action: {
+                                        presetToDelete = preset
+                                        showDeleteConfirmation = true
+                                    }) {
+                                        Label("Delete Preset", systemImage: "trash")
                                     }
                                 }
                             }
@@ -214,7 +291,7 @@ struct EqualizerView: View {
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 6)
-                            .strokeBorder(Theme.separator, lineWidth: 0.5)
+                            .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5)
                     )
                 }
                 .disabled(!effectsManager.isEqualizerEnabled)
@@ -226,17 +303,18 @@ struct EqualizerView: View {
     // MARK: - Equalizer Content
     private var equalizerContent: some View {
         HStack(alignment: .center, spacing: 0) {
-            // Preamp
+            // Preamp control (master gain, independent from EQ presets)
             VStack(spacing: 0) {
-                EQSlider(
+                ProfessionalEQSlider(
                     value: $effectsManager.preampGain,
                     range: -12...12,
                     label: "Preamp",
                     isPreamp: true,
-                    accentColor: Theme.accent
+                    accentColor: theme.currentTheme.primaryColor
                 )
                 .frame(width: 60)
                 
+                // Subtitle to indicate independence
                 Text("Master")
                     .font(.system(size: 9, weight: .medium))
                     .foregroundColor(.secondary.opacity(0.6))
@@ -244,24 +322,27 @@ struct EqualizerView: View {
             }
             .padding(.trailing, 32)
             
+            // Separator
             Rectangle()
-                .fill(Theme.separator)
+                .fill(Color(nsColor: .separatorColor))
                 .frame(width: 1)
                 .padding(.vertical, 20)
                 .padding(.trailing, 32)
             
-            // Bands
+            // 10 frequency bands
             HStack(alignment: .center, spacing: 16) {
                 ForEach(0..<10) { index in
-                    EQSlider(
+                    ProfessionalEQSlider(
                         value: Binding(
                             get: { Double(effectsManager.equalizerBands[index]) },
-                            set: { effectsManager.setEqualizerBand(index, gain: Float($0)) }
+                            set: { newValue in
+                                effectsManager.setEqualizerBand(index, gain: Float(newValue))
+                            }
                         ),
                         range: -12...12,
                         label: frequencies[index],
                         isPreamp: false,
-                        accentColor: Theme.accent
+                        accentColor: theme.currentTheme.primaryColor
                     )
                     .frame(width: 50)
                 }
@@ -270,6 +351,7 @@ struct EqualizerView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
+    // MARK: - Disabled State
     private var disabledState: some View {
         VStack(spacing: 16) {
             Image(systemName: "slider.horizontal.3")
@@ -288,6 +370,7 @@ struct EqualizerView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
+    // MARK: - Preset Application
     private func applyEQPreset(_ preset: EQPreset) {
         effectsManager.isEqualizerEnabled = true
         effectsManager.setEqualizerEnabled(true)
@@ -301,8 +384,8 @@ struct EqualizerView: View {
     }
 }
 
-// MARK: - EQ Slider
-struct EQSlider: View {
+// MARK: - Professional EQ Slider
+struct ProfessionalEQSlider: View {
     @Binding var value: Double
     let range: ClosedRange<Double>
     let label: String
@@ -314,24 +397,28 @@ struct EQSlider: View {
     
     var body: some View {
         VStack(spacing: 0) {
+            // Label at top
             Text(label)
                 .font(.system(size: isPreamp ? 12 : 11, weight: .semibold))
                 .foregroundColor(.secondary)
                 .padding(.bottom, 12)
             
+            // Value display
             Text(formattedValue)
                 .font(.system(size: isPreamp ? 14 : 12, weight: .semibold, design: .monospaced))
                 .foregroundColor(value != 0 ? accentColor : .secondary)
                 .frame(height: 20)
                 .padding(.bottom, 8)
             
+            // Slider
             GeometryReader { geometry in
                 ZStack(alignment: .center) {
                     // Track
                     RoundedRectangle(cornerRadius: 3)
-                        .fill(Theme.separator.opacity(0.5))
+                        .fill(Color(nsColor: .separatorColor).opacity(0.5))
                         .frame(width: isPreamp ? 6 : 5)
                     
+                    // Filled portion (from center to thumb)
                     let centerY = geometry.size.height / 2
                     let thumbY = valueToPosition(value, height: geometry.size.height)
                     let fillHeight = abs(thumbY - centerY)
@@ -348,41 +435,69 @@ struct EQSlider: View {
                             .position(x: geometry.size.width / 2, y: fillY + fillHeight / 2)
                     }
                     
-                    // Zero line
+                    // Zero line marker
                     Rectangle()
                         .fill(Color.secondary.opacity(0.6))
                         .frame(width: 20, height: 2)
                         .position(x: geometry.size.width / 2, y: centerY)
                     
+                    // Scale marks
+                    ForEach([12.0, 6.0, -6.0, -12.0], id: \.self) { db in
+                        let y = dbToPosition(db, height: geometry.size.height)
+                        Rectangle()
+                            .fill(Color.secondary.opacity(0.3))
+                            .frame(width: 8, height: 1)
+                            .position(x: geometry.size.width / 2, y: y)
+                    }
+                    
                     // Thumb
                     Circle()
-                        .fill(Theme.background)
-                        .overlay(Circle().strokeBorder(value != 0 ? accentColor : Color.secondary, lineWidth: 2))
+                        .fill(Color(nsColor: .controlBackgroundColor))
+                        .overlay(
+                            Circle()
+                                .strokeBorder(value != 0 ? accentColor : Color.secondary, lineWidth: 2)
+                        )
                         .shadow(color: Color.black.opacity(isDragging ? 0.3 : 0.2), radius: isDragging ? 4 : 2, y: 1)
                         .frame(width: 20, height: 20)
                         .scaleEffect(isDragging ? 1.1 : (isHovering ? 1.05 : 1.0))
                         .animation(.easeInOut(duration: 0.15), value: isDragging)
-                        .position(x: geometry.size.width / 2, y: thumbY)
+                        .animation(.easeInOut(duration: 0.15), value: isHovering)
+                        .position(
+                            x: geometry.size.width / 2,
+                            y: valueToPosition(value, height: geometry.size.height)
+                        )
                         .gesture(
                             DragGesture(minimumDistance: 0)
                                 .onChanged { gesture in
                                     isDragging = true
-                                    let val = positionToValue(gesture.location.y, height: geometry.size.height)
-                                    value = val
+                                    let newValue = positionToValue(gesture.location.y, height: geometry.size.height)
+                                    value = newValue
                                 }
-                                .onEnded { _ in isDragging = false }
+                                .onEnded { _ in
+                                    isDragging = false
+                                }
                         )
                 }
                 .frame(maxWidth: .infinity)
             }
             .frame(height: 240)
-            .onHover { isHovering = $0 }
+            .contentShape(Rectangle()) // Improved hit testing
+            .onHover { hovering in
+                isHovering = hovering
+            }
         }
-        .onTapGesture(count: 2) { value = 0 }
+        .onTapGesture(count: 2) {
+            // Double-click to reset to 0
+            value = 0
+        }
     }
     
     private var formattedValue: String {
-        value == 0 ? "0 dB" : String(format: "%+.0f dB", value)
+        if value == 0 {
+            return "0 dB"
+        } else {
+            return String(format: "%+.0f dB", value)
+        }
     }
     
     private func valueToPosition(_ value: Double, height: CGFloat) -> CGFloat {
@@ -393,10 +508,20 @@ struct EQSlider: View {
     private func positionToValue(_ position: CGFloat, height: CGFloat) -> Double {
         let normalized = 1.0 - (position / height)
         let clamped = max(0.0, min(1.0, normalized))
-        let raw = range.lowerBound + clamped * (range.upperBound - range.lowerBound)
-        if abs(raw) < 0.5 { return 0.0 }
-        // Snap to integer values for cleaner preset saves
-        return round(raw)
+        let rawValue = range.lowerBound + clamped * (range.upperBound - range.lowerBound)
+        
+        // Snap to 0 when close (within 0.5 dB)
+        if abs(rawValue) < 0.5 {
+            return 0.0
+        }
+        
+        // Snap to integer values
+        return round(rawValue)
+    }
+    
+    private func dbToPosition(_ db: Double, height: CGFloat) -> CGFloat {
+        let normalized = (db - range.lowerBound) / (range.upperBound - range.lowerBound)
+        return height * (1.0 - normalized)
     }
 }
 
