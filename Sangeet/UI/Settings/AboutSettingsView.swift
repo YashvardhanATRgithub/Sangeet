@@ -9,8 +9,14 @@ import SwiftUI
 
 struct AboutSettingsView: View {
     @State private var libraryStats: LibraryStats?
-    @AppStorage("automaticUpdatesEnabled")
-    private var automaticUpdatesEnabled = true
+    @State private var isCheckingForUpdates = false
+    @State private var updateResult: UpdateResult?
+    
+    private enum UpdateResult {
+        case upToDate
+        case updateAvailable(version: String, url: URL)
+        case error(String)
+    }
     
     var body: some View {
         VStack(spacing: 24) {
@@ -64,7 +70,7 @@ struct AboutSettingsView: View {
     }
 
     private var appDetails: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 12) {
             Text(About.appTitle)
                 .font(.title)
                 .fontWeight(.bold)
@@ -73,10 +79,88 @@ struct AboutSettingsView: View {
                 .font(.subheadline)
                 .foregroundColor(.secondary)
             
-            // Check for updates mechanism (requires Sparkle, but we keep UI for now)
-            Toggle("Check for updates automatically", isOn: $automaticUpdatesEnabled)
-                .help("Automatically download and install updates when available")
-                .disabled(true) // Disabled until Sparkle is integrated
+            // Check for Updates Button
+            HStack(spacing: 12) {
+                Button(action: checkForUpdates) {
+                    HStack(spacing: 8) {
+                        if isCheckingForUpdates {
+                            ProgressView()
+                                .scaleEffect(0.7)
+                                .frame(width: 16, height: 16)
+                        } else {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                        }
+                        Text(isCheckingForUpdates ? "Checking..." : "Check for Updates")
+                    }
+                    .font(.system(size: 13))
+                }
+                .buttonStyle(.bordered)
+                .disabled(isCheckingForUpdates)
+                
+                // Update result indicator
+                if let result = updateResult {
+                    updateResultView(result)
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func updateResultView(_ result: UpdateResult) -> some View {
+        switch result {
+        case .upToDate:
+            HStack(spacing: 4) {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(.green)
+                Text("You're up to date!")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+            }
+        case .updateAvailable(let version, let url):
+            Button(action: {
+                NSWorkspace.shared.open(url)
+            }) {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.down.circle.fill")
+                        .foregroundColor(.blue)
+                    Text("v\(version) available")
+                        .font(.system(size: 12))
+                }
+            }
+            .buttonStyle(.plain)
+            .underline()
+        case .error(let message):
+            HStack(spacing: 4) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundColor(.orange)
+                Text(message)
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+            }
+        }
+    }
+    
+    private func checkForUpdates() {
+        isCheckingForUpdates = true
+        updateResult = nil
+        
+        Task {
+            do {
+                let info = try await UpdateChecker.shared.checkForUpdates()
+                await MainActor.run {
+                    if info.isAvailable {
+                        updateResult = .updateAvailable(version: info.latestVersion, url: info.releaseURL)
+                    } else {
+                        updateResult = .upToDate
+                    }
+                    isCheckingForUpdates = false
+                }
+            } catch {
+                await MainActor.run {
+                    updateResult = .error(error.localizedDescription)
+                    isCheckingForUpdates = false
+                }
+            }
         }
     }
 

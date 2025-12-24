@@ -11,7 +11,9 @@ struct About {
     static let appVersion = version
     static let appBuild = build
     
-    // Links
-    static let appWebsite = "https://github.com/yashvardhan-777/Audiophile" // Placeholder
-    static let appWiki = "https://github.com/yashvardhan-777/Audiophile/wiki" // Placeholder
+    // Links - GitHub Repository
+    static let appWebsite = "https://github.com/YashvardhanATRgithub/Sangeet"
+    static let appWiki = "https://github.com/YashvardhanATRgithub/Sangeet#readme"
+    static let releasesAPI = "https://api.github.com/repos/YashvardhanATRgithub/Sangeet/releases/latest"
+    static let releasesPage = "https://github.com/YashvardhanATRgithub/Sangeet/releases"
 }
