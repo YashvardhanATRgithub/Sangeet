@@ -1,74 +1,41 @@
 import SwiftUI
 
+import SwiftUI
+
 struct SearchView: View {
     @EnvironmentObject var services: AppServices
-    @State private var query = ""
+    @ObservedObject var theme = AppTheme.shared
     @State private var searchResults = DatabaseManager.SearchResults()
-    @FocusState private var searchFocused: Bool
     @State private var isSearching = false
     
-    // ... searchField remains similar ...
+    // HiFidelity uses a debounced search or an explicit task. We use Task with cancellation.
+    @State private var searchTask: Task<Void, Never>?
     
     var body: some View {
         VStack(spacing: 0) {
-            // Search Bar Area
-            searchField
-                .padding()
-                .background(Theme.background)
-                .onAppear { searchFocused = true }
-            
-            // Results
-            if searchResults.isEmpty && !query.isEmpty {
-                if isSearching {
-                    ProgressView()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    ContentUnavailableView("No matches", systemImage: "magnifyingglass", description: Text("Try a different artist, song, or album name."))
+            // Header Stats
+            if !searchResults.isEmpty {
+                HStack {
+                    Text("\(searchResults.totalCount) results")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
                 }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 8)
+                .background(Theme.background)
+            }
+            
+            if isSearching {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if searchResults.isEmpty && !services.searchQuery.isEmpty {
+                 ContentUnavailableView("No matches", systemImage: "magnifyingglass", description: Text("Try a different term."))
             } else if searchResults.isEmpty {
-                ContentUnavailableView("Search your library", systemImage: "magnifyingglass")
+                 ContentUnavailableView("Search your library", systemImage: "magnifyingglass")
             } else {
                 List {
-                    // Artists Section
-                    if !searchResults.artists.isEmpty {
-                        Section("Artists") {
-                            ForEach(searchResults.artists) { artist in
-                                NavigationLink(value: artist) {
-                                    HStack {
-                                        Image(systemName: "music.mic.circle.fill")
-                                            .font(.title2)
-                                            .foregroundStyle(Theme.accent)
-                                        Text(artist.name)
-                                            .font(.body)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Albums Section
-                    if !searchResults.albums.isEmpty {
-                        Section("Albums") {
-                            ForEach(searchResults.albums) { album in
-                                NavigationLink(value: album) {
-                                    HStack {
-                                        Image(systemName: "square.stack.fill")
-                                            .font(.title2)
-                                            .foregroundStyle(Theme.accent)
-                                        VStack(alignment: .leading) {
-                                            Text(album.title)
-                                                .font(.body)
-                                            Text(album.artist)
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Songs Section
+                    // Tracks (Top Priority)
                     if !searchResults.tracks.isEmpty {
                         Section("Songs") {
                             ForEach(searchResults.tracks) { track in
@@ -85,10 +52,6 @@ struct SearchView: View {
                                         Text(formatDuration(track.duration))
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
-                                        
-                                        Image(systemName: "play.circle.fill")
-                                            .foregroundStyle(Theme.accent)
-                                            .opacity(0.8)
                                     }
                                     .contentShape(Rectangle())
                                 }
@@ -96,67 +59,85 @@ struct SearchView: View {
                             }
                         }
                     }
+                    
+                    // Artists
+                    if !searchResults.artists.isEmpty {
+                        Section("Artists") {
+                            ForEach(searchResults.artists) { artist in
+                                NavigationLink(value: artist) {
+                                    HStack {
+                                        Image(systemName: "music.mic")
+                                            .foregroundStyle(theme.currentTheme.primaryColor)
+                                        Text(artist.name)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Albums
+                    if !searchResults.albums.isEmpty {
+                         Section("Albums") {
+                            ForEach(searchResults.albums) { album in
+                                NavigationLink(value: album) {
+                                    HStack {
+                                        Image(systemName: "square.stack")
+                                            .foregroundStyle(theme.currentTheme.primaryColor)
+                                        VStack(alignment: .leading) {
+                                            Text(album.title)
+                                            Text(album.artist)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                }
+                            }
+                         }
+                    }
                 }
                 .listStyle(.plain)
-                .scrollContentBackground(.hidden)
             }
         }
-        .navigationTitle("Search")
-        .nowPlayingBarPadding()
         .background(Theme.background)
-        .onAppear { searchFocused = true }
+        .onChange(of: services.searchQuery) { _, newValue in
+            performSearch(newValue)
+        }
+        .onAppear {
+            if !services.searchQuery.isEmpty {
+                performSearch(services.searchQuery)
+            }
+        }
     }
     
     func performSearch(_ text: String) {
-        Task { @MainActor in
-            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmed.isEmpty {
-                searchResults = DatabaseManager.SearchResults()
-            } else {
-                isSearching = true
-                do {
-                    // Search all categories
-                    searchResults = try await services.database.search(query: trimmed)
-                } catch {
-                    print("Search error: \(error)")
-                    searchResults = DatabaseManager.SearchResults()
-                }
-                isSearching = false
-            }
+        searchTask?.cancel()
+        
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            searchResults = DatabaseManager.SearchResults()
+            isSearching = false
+            return
         }
-    }
-    
-    private var searchField: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
-            TextField("Artists, Songs, or Albums", text: $query)
-                .textFieldStyle(.plain)
-                .font(.body)
-                .focused($searchFocused)
-                .onChange(of: query) { _, newValue in
-                    performSearch(newValue)
-                }
-                .padding(.vertical, 8)
+        
+        isSearching = true
+        searchTask = Task {
+            // Debounce slightly
+            try? await Task.sleep(for: .milliseconds(300))
+            if Task.isCancelled { return }
             
-            if !query.isEmpty {
-                Button(action: { query = "" }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
+            do {
+                let results = try await services.database.search(query: trimmed)
+                if !Task.isCancelled {
+                    self.searchResults = results
+                    self.isSearching = false
                 }
-                .buttonStyle(.plain)
+            } catch {
+                print("Search failed: \(error)")
+                if !Task.isCancelled {
+                    self.isSearching = false
+                }
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.white.opacity(0.08))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Theme.accent.opacity(0.35), lineWidth: 1)
-        )
     }
     
     func formatDuration(_ duration: TimeInterval) -> String {
@@ -165,3 +146,4 @@ struct SearchView: View {
         return String(format: "%d:%02d", minutes, seconds)
     }
 }
+

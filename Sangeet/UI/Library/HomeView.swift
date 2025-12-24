@@ -77,7 +77,7 @@ struct HomeView: View {
     // Hero and importFolder removed
     
     private func playAndQueue(track: Track, from list: [Track]) {
-        services.playback.play(track)
+        services.playback.play(track: track)
         if let index = list.firstIndex(where: { $0.id == track.id }) {
             let nextTracks = list.dropFirst(index + 1)
             for t in nextTracks {

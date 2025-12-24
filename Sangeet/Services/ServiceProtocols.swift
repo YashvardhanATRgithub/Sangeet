@@ -1,5 +1,6 @@
 import Foundation
 import AVFoundation
+import AppKit
 
 // MARK: - Library Scanning
 protocol LibraryScanService {
@@ -12,6 +13,7 @@ protocol LibraryScanService {
 protocol MetadataService {
     func metadata(for url: URL) async throws -> Track
     func loadArtwork(for track: Track) async -> URL? // Returns local path to cached image
+    func artworkImage(for track: Track) async -> NSImage? // Returns in-memory cached image
 }
 
 // MARK: - Database / Persistence
@@ -24,7 +26,12 @@ protocol DatabaseLayer {
     func searchTracks(query: String) async -> [Track]
     func updatePlayCount(for trackID: UUID) async
     func toggleFavorite(for trackID: UUID) async
+    func saveLyrics(for trackID: UUID, lyrics: String) async
+    func deleteTrack(for trackID: UUID) async
+    func deleteTracks(in folder: URL) async
     func fetchFavorites() async throws -> [Track]
+    func fetchTracks(forAlbum album: String, artist: String) async throws -> [Track]
+    func fetchTracks(forArtist artist: String) async throws -> [Track]
 }
 
 // MARK: - Playback

@@ -80,7 +80,7 @@ struct CommandPalette: View {
             var loaded: [Track] = []
                 
             // Optimization: In real app, DB fetch by IDs
-            let all = try? await services.database.fetchAllTracks()
+            let all = try? await services.database.getAllTracks()
             if let all = all {
                  loaded = all.filter { ids.contains($0.id) }
             }
@@ -92,7 +92,7 @@ struct CommandPalette: View {
     }
     
     func play(_ track: Track) {
-        services.playback.play(track)
+        services.playback.play(track: track)
         isPresented = false
     }
 }

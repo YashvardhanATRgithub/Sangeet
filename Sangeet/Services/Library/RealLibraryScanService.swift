@@ -53,7 +53,12 @@ class RealLibraryScanService: LibraryScanService {
         defer {
             Task { @MainActor in self.isScanning = false }
             Task { await searchService?.buildIndex() }
-            NotificationCenter.default.post(name: .libraryDidUpdate, object: nil)
+            
+            // Prune missing files
+            Task {
+                await self.pruneMissingTracks()
+                NotificationCenter.default.post(name: .libraryDidUpdate, object: nil)
+            }
             
             let pending = stateQueue.sync { () -> [URL] in
                 let queued = pendingDirectories
@@ -83,17 +88,35 @@ class RealLibraryScanService: LibraryScanService {
                 options: [.skipsHiddenFiles, .skipsPackageDescendants]
             )
             
+            // 1. Collect files first (Fast IO)
+            var filesToProcess: [URL] = []
             while let fileURL = enumerator?.nextObject() as? URL {
-                if Task.isCancelled { break }
-                
                 if allowedExtensions.contains(fileURL.pathExtension.lowercased()) {
-                    // Found audio file
-                    do {
-                        let track = try await metadataService.metadata(for: fileURL)
-                        try await database.saveTrack(track)
-                    } catch {
-                        print("Failed to process \(fileURL.lastPathComponent): \(error)")
+                    filesToProcess.append(fileURL)
+                }
+            }
+            
+            // 2. Process in Parallel (throttled to 5 concurrent tasks to prevent network saturation)
+            await withTaskGroup(of: Void.self) { group in
+                var activeTasks = 0
+                for fileURL in filesToProcess {
+                    if Task.isCancelled { break }
+                    
+                    if activeTasks >= 5 {
+                        await group.next()
+                        activeTasks -= 1
                     }
+                    
+                    group.addTask {
+                        do {
+                            // This now includes Network Calls (Lyrics/Metadata)
+                            let track = try await self.metadataService.metadata(for: fileURL)
+                            try await self.database.saveTrack(track)
+                        } catch {
+                            print("Failed to process \(fileURL.lastPathComponent): \(error)")
+                        }
+                    }
+                    activeTasks += 1
                 }
             }
         }
@@ -155,6 +178,35 @@ class RealLibraryScanService: LibraryScanService {
         let beforeCount = monitoredDirectories.count
         monitoredDirectories.formUnion(directories)
         return monitoredDirectories.count != beforeCount
+    }
+    
+    private func pruneMissingTracks() async {
+        guard let allTracks = try? await database.fetchAllTracks() else { return }
+        
+        print("DEBUG: Pruning library. Checking \(allTracks.count) tracks...")
+        var deletedCount = 0
+        
+        for track in allTracks {
+            // Check if file exists. 
+            // Note: security scoped resource access might be needed if not in a monitored folder, 
+            // but for simple existence check in a standard user folder, fileExists usually works 
+            // if we have read access to parent. If access is lost, we might delete valid tracks.
+            // Safe bet: accessing.
+            
+            let accessing = track.url.startAccessingSecurityScopedResource()
+            let exists = FileManager.default.fileExists(atPath: track.url.path)
+            if accessing { track.url.stopAccessingSecurityScopedResource() }
+            
+            if !exists {
+                print("DEBUG: removing missing track: \(track.title) (\(track.url.path))")
+                await database.deleteTrack(for: track.id)
+                deletedCount += 1
+            }
+        }
+        
+        if deletedCount > 0 {
+            print("DEBUG: Pruned \(deletedCount) missing tracks.")
+        }
     }
 }
 

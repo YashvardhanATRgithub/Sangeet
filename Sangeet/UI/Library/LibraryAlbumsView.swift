@@ -18,7 +18,7 @@ struct LibraryAlbumsView: View {
                 
                 LazyVGrid(columns: columns, spacing: 30) {
                     ForEach(albums) { album in
-                        NavigationLink(destination: AlbumDetailView(album: album)) {
+                        NavigationLink(value: album) {
                             AlbumGridItem(album: album)
                         }
                         .buttonStyle(.plain)

@@ -1,8 +1,8 @@
 //
 //  BASSAudioEngine.swift
-//  Sangeet
+//  HiFidelity
 //
-//  Ported from HiFidelity
+//  Created by Varun Rathod on 14/11/25.
 //
 
 import Foundation
@@ -45,6 +45,9 @@ class BASSAudioEngine {
         // DACManager will handle the hog mode and notify us to reacquire
         if settings.synchronizeSampleRate {
             _ = dacManager.enableHogMode()
+        } else {
+            // Explicitly ensure hog mode is disabled on startup
+            dacManager.disableHogMode()
         }
         
         // Always use a specific device number (never -1) to prevent auto-switching
@@ -52,6 +55,7 @@ class BASSAudioEngine {
         let deviceNumber = findMatchingBASSDevice()
         let sampleRate = DWORD(dacManager.getCurrentDeviceSampleRate())
         
+        // Pass 0 for flags (Standard init)
         let result = BASS_Init(deviceNumber, sampleRate, 0, nil, nil)
         
         if result == 0 {
@@ -59,9 +63,7 @@ class BASSAudioEngine {
             isInitialized = false
             
             // Disable hog mode if initialization failed
-            if settings.synchronizeSampleRate {
-                dacManager.disableHogMode()
-            }
+            dacManager.disableHogMode()
             return
         }
         
@@ -193,7 +195,7 @@ class BASSAudioEngine {
         
         // Device needs reacquisition (after hog mode enabled)
         NotificationCenter.default.addObserver(
-            forName: DACManager.audioDeviceNeedsReacquisition,
+            forName: .audioDeviceNeedsReacquisition,
             object: nil,
             queue: .main
         ) { [weak self] _ in
@@ -202,7 +204,7 @@ class BASSAudioEngine {
         
         // Device change notifications
         NotificationCenter.default.addObserver(
-            forName: DACManager.audioDeviceChanged,
+            forName: .audioDeviceChanged,
             object: nil,
             queue: .main
         ) { [weak self] notification in
@@ -495,6 +497,11 @@ class BASSAudioEngine {
         }
         
         // CRITICAL: Switch device sample rate to match track for bit-perfect playback
+        // Why this is necessary:
+        // - Audio devices operate at a specific sample rate (e.g., 44.1kHz, 48kHz, 96kHz)
+        // - If device is at 44.1kHz and track is 96kHz, BASS will resample (quality loss)
+        // - By switching device to track's rate, BASS outputs directly without resampling
+        // - This is the ONLY way to achieve true bit-perfect playback
         if settings.synchronizeSampleRate {
             // Get stream info to determine actual sample rate and bit depth
             if let streamInfo = getStreamInfo() {
@@ -526,11 +533,14 @@ class BASSAudioEngine {
         }
         
         // Ensure the audio output device is started
+        // The output may be paused automatically if the output device becomes unavailable (e.g., disconnected)
+        // or after device switches. BASS_Start() resumes the output before playing the channel.
         if BASS_IsStarted() == 0 {
             Logger.debug("Output device is paused/stopped, starting it")
             if BASS_Start() == 0 {
                 let errorCode = BASS_ErrorGetCode()
                 Logger.warning("Failed to start output device: \(errorCode)")
+                // Continue anyway - try to play the channel
             }
         }
         
@@ -619,6 +629,7 @@ class BASSAudioEngine {
         }
         
         // Set up gapless transition sync on current stream
+        // This triggers RIGHT BEFORE the current track ends for seamless transition
         setupGaplessSyncCallback()
         
         Logger.debug("Pre-loaded next track for gapless: \(url.lastPathComponent)")
@@ -626,14 +637,17 @@ class BASSAudioEngine {
         return true
     }
     
-    // Set up a sync callback to trigger gapless transition at the right moment
+    /// Set up a sync callback to trigger gapless transition at the right moment
+    /// This callback fires when the stream reaches near the end, allowing seamless transition
     private func setupGaplessSyncCallback() {
         guard currentStream != 0, nextStream != 0 else { return }
         
         // Calculate position to trigger transition (50ms before the end)
+        // This gives us just enough time to execute the switch without gap
         let duration = BASS_ChannelGetLength(currentStream, DWORD(BASS_POS_BYTE))
         guard duration != QWORD(bitPattern: -1) else { return }
         
+        // Convert 50ms to bytes
         let triggerOffset = BASS_ChannelSeconds2Bytes(currentStream, 0.05) // 50ms before end
         let triggerPosition = duration > triggerOffset ? duration - triggerOffset : duration
         
@@ -644,6 +658,7 @@ class BASSAudioEngine {
             triggerPosition,
             { handle, channel, data, user in
                 // This callback fires 50ms before the track ends
+                // Post notification to switch to next track
                 NotificationCenter.default.post(
                     name: .bassGaplessTransition,
                     object: nil
@@ -656,6 +671,8 @@ class BASSAudioEngine {
     }
     
     /// Switch to the pre-loaded next track (gapless transition)
+    /// This should be called from the sync callback for true gapless playback
+    /// Works seamlessly with or without sample rate synchronization
     func switchToPreloadedTrack(volume: Float) -> Bool {
         guard nextStream != 0 else {
             Logger.error("No pre-loaded track available")
@@ -686,16 +703,20 @@ class BASSAudioEngine {
                 }
             }
         } else {
+            // When sync is OFF, BASS handles any necessary resampling automatically
             Logger.debug("Sample rate sync disabled - BASS will handle resampling if needed")
         }
         
         // Prepare the next stream completely BEFORE switching
+        // Apply volume and effects to next stream
         BASS_ChannelSetAttribute(nextStream, DWORD(BASS_ATTRIB_VOL), volume)
         effectsManager.setStream(nextStream)
         
         // CRITICAL: Do atomic switch - stop current and start next with minimal gap
+        // Store the old stream handle
         let oldStream = currentStream
         
+        // Make next stream the current stream FIRST (before stopping old)
         currentStream = nextStream
         nextStream = 0
         
@@ -712,6 +733,7 @@ class BASSAudioEngine {
         }
         
         // NOW we can safely stop and free the old stream
+        // The new one is already playing, so gap is minimal
         if oldStream != 0 {
             BASS_ChannelStop(oldStream)
             BASS_StreamFree(oldStream)
@@ -720,7 +742,8 @@ class BASSAudioEngine {
         // Set up end callback for the new current stream
         setupStreamEndCallback()
         
-        // Switch device sample rate if needed
+        // Switch device sample rate if needed (do this AFTER starting playback to minimize gap)
+        // This only happens when sync mode is ON and the rate is different
         if needsSampleRateSwitch {
             if dacManager.setDeviceSampleRate(targetRate) {
                 Logger.info("✓ Device switched to \(Int(targetRate)) Hz for bit-perfect playback")
@@ -733,10 +756,12 @@ class BASSAudioEngine {
         return true
     }
     
+    /// Check if next track is pre-loaded
     func hasPreloadedTrack() -> Bool {
         return nextStream != 0
     }
     
+    /// Clear pre-loaded track
     func clearPreloadedTrack() {
         if nextStream != 0 {
             BASS_StreamFree(nextStream)
@@ -956,10 +981,5 @@ enum BASSError: Int {
     }
 }
 
-// MARK: - Notification Extension
 
-extension Notification.Name {
-    static let bassStreamEnded = Notification.Name("BASSStreamEnded")
-    static let bassGaplessTransition = Notification.Name("BASSGaplessTransition")
-    static let audioDeviceChangeComplete = Notification.Name("AudioDeviceChangeComplete")
-}
+

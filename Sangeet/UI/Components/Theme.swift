@@ -1,27 +1,17 @@
 import SwiftUI
 
 enum Theme {
-    static let background = LinearGradient(
-        colors: [
-            Color(red: 0.07, green: 0.09, blue: 0.17),
-            Color(red: 0.05, green: 0.08, blue: 0.15),
-            Color(red: 0.03, green: 0.05, blue: 0.12)
-        ],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-    )
+    // HiFidelity uses a deeply dark neutral gray, standard macOS window background in dark mode.
+    static let background = Color(nsColor: .windowBackgroundColor)
+    static let panel = Color(nsColor: .windowBackgroundColor)
     
-    static let panel = LinearGradient(
-        colors: [
-            Color(red: 0.16, green: 0.2, blue: 0.27),
-            Color(red: 0.11, green: 0.14, blue: 0.2)
-        ],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-    )
+    static let separator = Color.white.opacity(0.1)
     
-    static let accent = Color(red: 0.36, green: 0.72, blue: 1.0)
-    static let accentWarm = Color(red: 0.99, green: 0.43, blue: 0.6)
+    // HiFidelity uses specific yellow often, or blue. Sangeet accent is blue/cyan.
+    static var accent: Color {
+        AppTheme.shared.currentTheme.primaryColor
+    }
+    static let accentWarm = Color(red: 0.36, green: 0.72, blue: 1.0)
 }
 
 extension View {

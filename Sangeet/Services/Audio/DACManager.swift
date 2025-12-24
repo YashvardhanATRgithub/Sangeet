@@ -1,8 +1,8 @@
 //
 //  DACManager.swift
-//  Sangeet
+//  HiFidelity
 //
-//  Ported from HiFidelity
+//  Created for HiFidelity
 //
 
 import Foundation
@@ -35,11 +35,6 @@ class DACManager: ObservableObject {
     
     private var isHogging = false
     private var deviceListListenerProc: AudioObjectPropertyListenerProc?
-    
-    // Notifications
-    static let audioDeviceChanged = Notification.Name("AudioDeviceChanged")
-    static let audioDeviceRemoved = Notification.Name("AudioDeviceRemoved")
-    static let audioDeviceNeedsReacquisition = Notification.Name("AudioDeviceNeedsReacquisition")
     
     private init() {
         currentDeviceID = getDefaultOutputDevice()
@@ -78,6 +73,7 @@ class DACManager: ObservableObject {
             return 0
         }
         
+        Logger.debug("Default output device ID: \(deviceID)")
         return deviceID
     }
     
@@ -151,7 +147,7 @@ class DACManager: ObservableObject {
         isHogging = true
         Logger.info("Hog mode enabled on device \(currentDeviceID) - BASS handles sample rate conversion")        
         // Notify that device needs reacquisition in BASS
-        NotificationCenter.default.post(name: DACManager.audioDeviceNeedsReacquisition, object: nil)
+        NotificationCenter.default.post(name: .audioDeviceNeedsReacquisition, object: nil)
         
         return true
     }
@@ -352,7 +348,13 @@ class DACManager: ObservableObject {
         
         return deviceUID as String
     }
+}
 
+// MARK: - Notifications
+
+
+
+extension DACManager {
     // MARK: - Device Change Monitoring
     
     /// Set up listener for device list changes (hot-plugging)
@@ -420,29 +422,46 @@ class DACManager: ObservableObject {
         
         // Get new device list
         let currentDeviceIDs = Set(availableDevices.map { $0.id })
+        Logger.info("Current device IDs: \(currentDeviceIDs)")
         
         // Check for removed devices
         let removedDevices = previousDeviceIDs.subtracting(currentDeviceIDs)
+        
         
         // If the CURRENT device is in the "removed" list, double-check if it's actually gone from the system.
         if currentDeviceID != 0 && removedDevices.contains(currentDeviceID) {
             if doesDeviceIDExist(currentDeviceID) {
                 Logger.info("⚠️ Device \(currentDeviceID) lost output streams but is still attached. Ignoring removal event.")
+                // Determine if we should pause playback or just wait.
+                // For now, we simply return to prevent the "Device Removed" shutdown logic.
                 return
             }
         }
         
         // Check if current device was removed
+        // Handle two cases: 1) explicit device ID removed, 2) currentDeviceID is 0/invalid and devices were removed
         if (currentDeviceID != 0 && removedDevices.contains(currentDeviceID)) || 
            (currentDeviceID == 0 && !removedDevices.isEmpty && !previousDeviceIDs.isEmpty) {
             Logger.warning("⚠️ Current audio device (ID: \(currentDeviceID)) was removed or invalid!")
             handleCurrentDeviceRemoved()
+        } else if !removedDevices.isEmpty {
+            Logger.debug("Removed devices: \(removedDevices) (not current device)")
+        }
+        
+        // Check for added devices
+        let addedDevices = currentDeviceIDs.subtracting(previousDeviceIDs)
+        if !addedDevices.isEmpty {
+            Logger.info("✓ \(addedDevices.count) new audio device(s) detected")
+        }
+        
+        if !removedDevices.isEmpty {
+            Logger.info("✗ \(removedDevices.count) audio device(s) removed")
         }
     }
     
     /// Handle current device being removed
     private func handleCurrentDeviceRemoved() {
-        // Release hog mode if active
+        // Release hog mode if active (device is gone, just clear the flag)
         let wasHogging = isHogging
         if wasHogging {
             isHogging = false
@@ -459,7 +478,7 @@ class DACManager: ObservableObject {
         
         // Post notification to stop playback
         NotificationCenter.default.post(
-            name: DACManager.audioDeviceRemoved,
+            name: .audioDeviceRemoved,
             object: nil
         )
         
@@ -486,26 +505,103 @@ class DACManager: ObservableObject {
                 )
                 
                 Logger.info("Auto-switching to default device: \(newDevice.name)")
+                if wasHogging {
+                    Logger.info("Sample rate synchronization was disabled - re-enable manually if needed")
+                }
                 
-                // Update device on main thread
+                // Update device on main thread (for UI updates) and post notification
                 DispatchQueue.main.async { [weak self] in
                     guard let self = self else { return }
                     
+                    // Update to new device (triggers @Published updates for UI)
                     self.currentDeviceID = defaultDeviceID
                     self.currentDevice = newDevice
+                    Logger.debug("Updated currentDeviceID to \(defaultDeviceID)")
                     
                     // Wait a bit for device to stabilize, then notify BASS
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                        NotificationCenter.default.post(name: DACManager.audioDeviceChanged, object: newDevice)
+                        Logger.info("Posting audioDeviceChanged notification for: \(newDevice.name)")
+                        NotificationCenter.default.post(name: .audioDeviceChanged, object: newDevice)
                         self?.deviceWasRemoved = false
                     }
+                }
+            } else {
+                // Couldn't get info for "default" device - fallback to first available device
+                Logger.warning("Could not get info for default device ID: \(defaultDeviceID), using first available device")
+                
+                if let firstDevice = availableDevices.first {
+                    Logger.info("Auto-switching to first available device: \(firstDevice.name)")
+                    
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self = self else { return }
+                        
+                        self.currentDeviceID = firstDevice.id
+                        self.currentDevice = firstDevice
+                        
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                            Logger.info("Posting audioDeviceChanged notification for: \(firstDevice.name)")
+                            NotificationCenter.default.post(name: .audioDeviceChanged, object: firstDevice)
+                            self?.deviceWasRemoved = false
+                        }
+                    }
+                } else {
+                    Logger.error("No devices available at all!")
+                    DispatchQueue.main.async { [weak self] in
+                        self?.currentDeviceID = 0
+                        self?.currentDevice = nil
+                    }
+                }
+            }
+        } else {
+            // System returned 0 for default device - wait and retry
+            Logger.warning("No default device available yet (ID=0), waiting for system to stabilize...")
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                guard let self = self else { return }
+                
+                // Retry getting default device
+                let retryDefaultID = self.getDefaultOutputDevice()
+                
+                if retryDefaultID != 0 {
+                    Logger.info("Default device now available: \(retryDefaultID), retrying switch")
+                    self.refreshDeviceList()
+                    
+                    if let newDevice = self.availableDevices.first(where: { $0.id == retryDefaultID }) {
+                        self.currentDeviceID = retryDefaultID
+                        self.currentDevice = newDevice
+                        Logger.info("Successfully switched to: \(newDevice.name)")
+                        
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                            NotificationCenter.default.post(name: .audioDeviceChanged, object: newDevice)
+                            self?.deviceWasRemoved = false
+                        }
+                    }
+                } else if let firstDevice = self.availableDevices.first {
+                    // Still no default, use first available
+                    Logger.warning("Still no default device, using first available: \(firstDevice.name)")
+                    self.currentDeviceID = firstDevice.id
+                    self.currentDevice = firstDevice
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                        NotificationCenter.default.post(name: .audioDeviceChanged, object: firstDevice)
+                        self?.deviceWasRemoved = false
+                    }
+                } else {
+                    Logger.error("No devices available after retry")
                 }
             }
         }
     }
     
-    /// Refresh device info
+    /// Update device when needed (called manually) - only used at app startup
+    func updateDevice() {
+        currentDeviceID = getDefaultOutputDevice()
+    }
+    
+    /// Refresh device info (without changing user's selected device)
     func refreshDevice() {
+        // Don't change currentDeviceID - preserve user's selection
+        // Just refresh the device list to get updated info
         refreshDeviceList()
     }
     
@@ -528,7 +624,10 @@ class DACManager: ObservableObject {
             &propertySize
         )
         
-        guard status == noErr else { return [] }
+        guard status == noErr else {
+            Logger.error("Failed to get device list size: \(status)")
+            return []
+        }
         
         let deviceCount = Int(propertySize) / MemoryLayout<AudioDeviceID>.size
         var deviceIDs = [AudioDeviceID](repeating: 0, count: deviceCount)
@@ -542,15 +641,23 @@ class DACManager: ObservableObject {
             &deviceIDs
         )
         
-        guard status == noErr else { return [] }
+        guard status == noErr else {
+            Logger.error("Failed to get device list: \(status)")
+            return []
+        }
         
         var outputDevices: [AudioOutputDevice] = []
         
         for deviceID in deviceIDs {
-            if !hasOutputStreams(deviceID: deviceID) { continue }
+            // Check if device has output streams
+            if !hasOutputStreams(deviceID: deviceID) {
+                continue
+            }
             
             guard let name = getDeviceNameForID(deviceID),
-                  let uid = getDeviceUIDForID(deviceID) else { continue }
+                  let uid = getDeviceUIDForID(deviceID) else {
+                continue
+            }
             
             let sampleRate = getCurrentSampleRateForDevice(deviceID)
             let channels = getChannelCountForDevice(deviceID)
@@ -569,6 +676,7 @@ class DACManager: ObservableObject {
         return outputDevices
     }
     
+    /// Helper: Checks if a device ID technically still exists in the system (even if it has no streams currently)
     private func doesDeviceIDExist(_ id: AudioDeviceID) -> Bool {
         var propertyAddress = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDevices,
@@ -590,7 +698,7 @@ class DACManager: ObservableObject {
         let deviceCount = Int(propertySize) / MemoryLayout<AudioDeviceID>.size
         var deviceIDs = [AudioDeviceID](repeating: 0, count: deviceCount)
         
-        AudioObjectGetPropertyData(
+        let getStatus = AudioObjectGetPropertyData(
             AudioObjectID(kAudioObjectSystemObject),
             &propertyAddress,
             0,
@@ -599,9 +707,12 @@ class DACManager: ObservableObject {
             &deviceIDs
         )
         
+        guard getStatus == noErr else { return false }
+        
         return deviceIDs.contains(id)
     }
     
+    /// Check if device has output streams
     private func hasOutputStreams(deviceID: AudioDeviceID) -> Bool {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyStreamConfiguration,
@@ -618,7 +729,9 @@ class DACManager: ObservableObject {
             &propertySize
         )
         
-        guard status == noErr, propertySize > 0 else { return false }
+        guard status == noErr, propertySize > 0 else {
+            return false
+        }
         
         let bufferList = UnsafeMutablePointer<AudioBufferList>.allocate(capacity: 1)
         defer { bufferList.deallocate() }
@@ -632,11 +745,14 @@ class DACManager: ObservableObject {
             bufferList
         )
         
-        guard getStatus == noErr else { return false }
+        guard getStatus == noErr else {
+            return false
+        }
         
         return bufferList.pointee.mNumberBuffers > 0
     }
     
+    /// Get device name for a specific device ID
     private func getDeviceNameForID(_ deviceID: AudioDeviceID) -> String? {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyDeviceNameCFString,
@@ -659,6 +775,7 @@ class DACManager: ObservableObject {
         return status == noErr ? (deviceName as String) : nil
     }
     
+    /// Get device UID for a specific device ID
     private func getDeviceUIDForID(_ deviceID: AudioDeviceID) -> String? {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyDeviceUID,
@@ -681,6 +798,7 @@ class DACManager: ObservableObject {
         return status == noErr ? (deviceUID as String) : nil
     }
     
+    /// Get current sample rate for a specific device
     private func getCurrentSampleRateForDevice(_ deviceID: AudioDeviceID) -> Float64 {
         var sampleRate = Float64(0)
         var propertySize = UInt32(MemoryLayout<Float64>.size)
@@ -703,6 +821,7 @@ class DACManager: ObservableObject {
         return status == noErr ? sampleRate : 44100
     }
     
+    /// Get number of output channels for a specific device
     private func getChannelCountForDevice(_ deviceID: AudioDeviceID) -> Int {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyStreamConfiguration,
@@ -711,7 +830,7 @@ class DACManager: ObservableObject {
         )
         
         var propertySize: UInt32 = 0
-        let status = AudioObjectGetPropertyDataSize(
+        var status = AudioObjectGetPropertyDataSize(
             deviceID,
             &address,
             0,
@@ -719,14 +838,15 @@ class DACManager: ObservableObject {
             &propertySize
         )
         
-        guard status == noErr, propertySize > 0 else { return 2 }
+        guard status == noErr, propertySize > 0 else {
+            return 2 // Default to stereo
+        }
         
-        // Simplified buffer list size (safe for standard devices)
         let bufferListSize = Int(propertySize)
         let bufferListPointer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferListSize)
         defer { bufferListPointer.deallocate() }
         
-        let getStatus = AudioObjectGetPropertyData(
+        status = AudioObjectGetPropertyData(
             deviceID,
             &address,
             0,
@@ -735,16 +855,20 @@ class DACManager: ObservableObject {
             bufferListPointer
         )
         
-        guard getStatus == noErr else { return 2 }
+        guard status == noErr else {
+            return 2 // Default to stereo
+        }
         
         let bufferList = bufferListPointer.withMemoryRebound(to: AudioBufferList.self, capacity: 1) { $0.pointee }
+        
         var totalChannels = 0
         let numBuffers = Int(bufferList.mNumberBuffers)
         
         if numBuffers > 0 {
-             let buffersPointer = UnsafeMutableAudioBufferListPointer(
-                 UnsafeMutablePointer(&(bufferListPointer.withMemoryRebound(to: AudioBufferList.self, capacity: 1) { $0 }.pointee))
-             )
+            let buffersPointer = UnsafeMutableAudioBufferListPointer(
+                UnsafeMutablePointer(&(bufferListPointer.withMemoryRebound(to: AudioBufferList.self, capacity: 1) { $0 }.pointee))
+            )
+            
             for buffer in buffersPointer {
                 totalChannels += Int(buffer.mNumberChannels)
             }
@@ -758,37 +882,60 @@ class DACManager: ObservableObject {
         availableDevices = getAllOutputDevices()
         currentDevice = availableDevices.first { $0.id == currentDeviceID }
         
+        // Only update to system default if we're in an invalid state (device is 0 or doesn't exist)
+        // Don't follow system default changes - preserve user's device selection
         if currentDeviceID == 0 {
             let defaultID = getDefaultOutputDevice()
             if defaultID != 0 {
+                Logger.debug("No device selected, using system default: \(defaultID)")
                 currentDeviceID = defaultID
                 currentDevice = availableDevices.first { $0.id == defaultID }
             }
+        } else if currentDevice == nil {
+            // Current device no longer exists (was removed)
+            // This will be handled by handleCurrentDeviceRemoved, don't auto-switch here
+            Logger.debug("Current device ID \(currentDeviceID) no longer available")
         }
+        
+        Logger.debug("Found \(availableDevices.count) output devices, current: \(currentDevice?.name ?? "none")")
     }
     
     /// Switch to a different audio device
     func switchToDevice(_ device: AudioOutputDevice) -> Bool {
-        guard device.id != currentDeviceID else { return true }
+        guard device.id != currentDeviceID else {
+            Logger.debug("Already using device: \(device.name)")
+            return true
+        }
         
+        Logger.info("Switching to device: \(device.name)")
+        
+        // Disable hog mode on old device if active
+        // User must manually re-enable sample rate synchronization for the new device
         let wasHogging = isHogging
         if wasHogging {
             disableHogMode()
+            Logger.info("Sample rate synchronization disabled - re-enable manually if needed for new device")
         }
         
+        // Update device state on main thread and notify observers
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             
+            // Update @Published properties (triggers UI updates)
             self.currentDeviceID = device.id
             self.currentDevice = device
             
+            // Update settings if hog mode was disabled
             if wasHogging {
                 AudioSettings.shared.synchronizeSampleRate = false
             }
             
-            NotificationCenter.default.post(name: DACManager.audioDeviceChanged, object: device)
+            // Notify BASS to move streams (on main thread)
+            Logger.debug("Posting audioDeviceChanged notification for: \(device.name)")
+            NotificationCenter.default.post(name: .audioDeviceChanged, object: device)
         }
         
         return true
     }
 }
+

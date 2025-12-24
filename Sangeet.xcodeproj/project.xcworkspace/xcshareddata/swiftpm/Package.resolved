@@ -1,0 +1,24 @@
+{
+  "originHash" : "a9535e4448a890f8513f569c71f06e8654e7f7b872ed805df610c6db1f6bb42e",
+  "pins" : [
+    {
+      "identity" : "cbass",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Treata11/CBass",
+      "state" : {
+        "branch" : "main",
+        "revision" : "74cb58f5c900bc1579173fb3b2d94e7c4463a238"
+      }
+    },
+    {
+      "identity" : "grdb.swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/groue/GRDB.swift.git",
+      "state" : {
+        "branch" : "master",
+        "revision" : "aa0079aeb82a4bf00324561a40bffe68c6fe1c26"
+      }
+    }
+  ],
+  "version" : 3
+}

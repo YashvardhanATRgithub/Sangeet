@@ -1,8 +1,8 @@
 //
 //  AudioEffectsManager.swift
-//  Sangeet
+//  HiFidelity
 //
-//  Ported from HiFidelity
+//  Manages DSP effects and custom processing for audio playback
 //
 
 import Foundation
@@ -427,6 +427,10 @@ class AudioEffectsManager: ObservableObject {
         }
         
         Logger.info("Loaded audio effects settings from UserDefaults")
+        Logger.debug("EQ Enabled: \(isEqualizerEnabled), Preset: \(currentPresetName) (\(currentPresetType.rawValue))")
+        Logger.debug("Bands: \(equalizerBands), Preamp: \(preampGain) dB")
+        Logger.debug("Reverb Enabled: \(isReverbEnabled), Mix: \(reverbMix) dB")
+        Logger.debug("Custom Presets: \(customPresets.count)")
     }
     
     /// Save equalizer settings to UserDefaults
@@ -540,6 +544,54 @@ class AudioEffectsManager: ObservableObject {
         }
         
         return false
+    }
+    
+    /// Export preset to JSON
+    func exportPreset(_ preset: CustomEQPreset) -> String? {
+        do {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            let data = try encoder.encode(preset)
+            return String(data: data, encoding: .utf8)
+        } catch {
+            Logger.error("Failed to export preset: \(error)")
+            return nil
+        }
+    }
+    
+    /// Import preset from JSON
+    func importPreset(from jsonString: String) -> Bool {
+        guard let data = jsonString.data(using: .utf8) else {
+            Logger.error("Invalid JSON string")
+            return false
+        }
+        
+        do {
+            let decoder = JSONDecoder()
+            var preset = try decoder.decode(CustomEQPreset.self, from: data)
+            
+            // Generate new ID and update date
+            preset.id = UUID()
+            preset.dateCreated = Date()
+            
+            // Make name unique if needed
+            var uniqueName = preset.name
+            var counter = 1
+            while customPresets.contains(where: { $0.name == uniqueName }) {
+                uniqueName = "\(preset.name) (\(counter))"
+                counter += 1
+            }
+            preset.name = uniqueName
+            
+            customPresets.append(preset)
+            saveCustomPresets()
+            
+            Logger.info("Imported custom preset: \(preset.name)")
+            return true
+        } catch {
+            Logger.error("Failed to import preset: \(error)")
+            return false
+        }
     }
 }
 

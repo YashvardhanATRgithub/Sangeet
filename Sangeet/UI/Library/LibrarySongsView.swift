@@ -1,15 +1,56 @@
 import SwiftUI
 import AppKit
+import Combine
+
+class LibraryViewModel: ObservableObject {
+    @Published var tracks: [Track] = []
+    @Published var isLoading = false
+    
+    init() {
+        loadTracks()
+        
+        NotificationCenter.default.addObserver(forName: .libraryDidUpdate, object: nil, queue: .main) { [weak self] _ in
+            self?.loadTracks()
+        }
+    }
+    
+    func loadTracks() {
+        isLoading = true
+        Task {
+            do {
+                let allTracks = try await AppServices.shared.database.getAllTracks()
+                await MainActor.run {
+                    self.tracks = allTracks
+                    self.isLoading = false
+                }
+            } catch {
+                print("Error loading tracks: \(error)")
+                await MainActor.run { self.isLoading = false }
+            }
+        }
+    }
+}
 
 struct LibrarySongsView: View {
     @EnvironmentObject var services: AppServices
     @EnvironmentObject var playlists: PlaylistStore
-    @State private var tracks: [Track] = []
+    @StateObject var libraryStore = LibraryViewModel()
+    
+    @State private var searchResults: [Track] = []
     @State private var searchText = ""
     @FocusState private var searchFocused: Bool
     @State private var showingNewPlaylist = false
     @State private var newPlaylistName = ""
-    @State private var pendingPlaylistTrackIDs: [UUID] = []
+    @State private var pendingPlaylistTrackIDs: [Int64] = []
+    
+    // Derived Data Source
+    var tracks: [Track] {
+        if searchText.isEmpty {
+            return libraryStore.tracks
+        } else {
+            return searchResults
+        }
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -21,7 +62,12 @@ struct LibrarySongsView: View {
                     Text("Your entire collection, ready to play.")
                         .foregroundStyle(.secondary)
                 }
+                Spacer()
+                Spacer()
             }
+            
+            // ... (rest of view) ...
+
             
             // Search
             HStack(spacing: 10) {
@@ -38,6 +84,7 @@ struct LibrarySongsView: View {
                 if !searchText.isEmpty {
                     Button {
                         searchText = ""
+                        searchResults = []
                         performSearch(query: "")
                     } label: {
                         Image(systemName: "xmark.circle.fill")
@@ -58,23 +105,31 @@ struct LibrarySongsView: View {
             )
             
             // List
-            if tracks.isEmpty {
-                VStack(spacing: 20) {
-                    Image(systemName: "music.note.list")
-                        .font(.system(size: 50))
-                        .foregroundStyle(.tertiary)
-                    Text("No songs found")
-                        .font(.title2)
-                        .foregroundStyle(.secondary)
-                    
-                    Button("Import Music") {
-                       importFolder()
+            if libraryStore.isLoading && tracks.isEmpty {
+                 ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if tracks.isEmpty {
+                 // Empty State Logic
+                 if !searchText.isEmpty {
+                     ContentUnavailableView.search(text: searchText)
+                 } else {
+                    VStack(spacing: 20) {
+                        Image(systemName: "music.note.list")
+                            .font(.system(size: 50))
+                            .foregroundStyle(.tertiary)
+                        Text("No songs found")
+                            .font(.title2)
+                            .foregroundStyle(.secondary)
+                        
+                        Button("Manage Library") {
+                           manageLibrary()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Theme.accentWarm)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Theme.accentWarm)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .glassCard()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .glassCard()
+                 }
             } else {
                 ScrollView {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 20)], spacing: 20) {
@@ -82,6 +137,35 @@ struct LibrarySongsView: View {
                             SongGridItem(track: track)
                                 .onTapGesture {
                                     playAndAutoQueue(track: track)
+                                }
+                                .contextMenu {
+                                    Button {
+                                        playAndAutoQueue(track: track)
+                                    } label: {
+                                        Label("Play", systemImage: "play")
+                                    }
+                                    
+                                    Divider()
+                                    
+                                    Button {
+                                        NSWorkspace.shared.activateFileViewerSelecting([track.url])
+                                    } label: {
+                                        Label("Show in Finder", systemImage: "folder")
+                                    }
+                                    
+                                    Divider()
+                                    
+                                    Button(role: .destructive) {
+                                        deleteTrack(track)
+                                    } label: {
+                                        Label("Delete from Library", systemImage: "trash")
+                                    }
+                                    
+                                    Button(role: .destructive) {
+                                        deleteFile(track)
+                                    } label: {
+                                        Label("Move to Trash", systemImage: "trash.fill")
+                                    }
                                 }
                         }
                     }
@@ -95,13 +179,15 @@ struct LibrarySongsView: View {
         .onTapGesture {
             searchFocused = false
         }
-        .task {
-            loadTracks()
-        }
+        // Removed .task { loadTracks() } -> Data is loaded by LibraryStore init
         .onReceive(NotificationCenter.default.publisher(for: .libraryDidUpdate)) { _ in
-            loadTracks()
+            // LibraryStore handles its own updates, but if search is active, re-run search
+            if !searchText.isEmpty {
+                performSearch(query: searchText)
+            }
         }
         .onAppear {
+            // No-op
             // keep search keyboard active when entering the screen
             // self.searchFocused = true 
             // Disabled auto-focus to prevent stealing focus from global shortcuts
@@ -121,6 +207,9 @@ struct LibrarySongsView: View {
         } message: {
             Text("Add selected songs to a new playlist.")
         }
+        .popover(isPresented: $showingLibrarySettings) {
+             LibrarySettingsView()
+        }
     }
     
     func formatDuration(_ duration: TimeInterval) -> String {
@@ -129,57 +218,64 @@ struct LibrarySongsView: View {
         return String(format: "%d:%02d", minutes, seconds)
     }
     
-    func loadTracks() {
-        Task { @MainActor in
-            do {
-                self.tracks = try await services.database.fetchAllTracks()
-            } catch {
-                print("Error loading tracks: \(error)")
-            }
-        }
-    }
+    // Removed loadTracks()
     
     func performSearch(query: String) {
         Task { @MainActor in
             if query.isEmpty {
-                loadTracks()
+                searchResults = []
             } else {
                 let textConfig = query.trimmingCharacters(in: .whitespacesAndNewlines)
-                // Use SearchService or Database for full text
-                // For now, Database simple search:
-                self.tracks = await services.database.searchTracks(query: textConfig)
+                do {
+                    self.searchResults = try await services.database.searchTracks(query: textConfig)
+                } catch {
+                    print("Search error: \(error)")
+                    self.searchResults = []
+                }
             }
         }
     }
     
-    func importFolder() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = true // User requested file import support
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = true
-        
-        if panel.runModal() == .OK {
-            let urls = panel.urls
-            Task {
-                let directories = services.libraryAccess.directoryURLs(from: urls)
-                services.libraryAccess.addBookmarks(for: directories)
-                try? await services.library.startScan(directories: urls)
-                await services.search.buildIndex()
-                loadTracks()
-            }
-        }
+    @State private var showingLibrarySettings = false
+    
+    func manageLibrary() {
+        showingLibrarySettings = true
     }
     
     func playAndAutoQueue(track: Track) {
-        services.playback.play(track)
-        
-        // Auto-queue logic: find index and queue subsequent tracks
         if let index = tracks.firstIndex(where: { $0.id == track.id }) {
-            // Queue next 50 songs to ensure continuous playback
-            let nextTracks = tracks.dropFirst(index + 1).prefix(50)
-            for t in nextTracks {
-                 services.playback.addToQueue(t)
+            let queue = Array(tracks.dropFirst(index))
+            services.playback.startPlaylist(queue)
+        } else {
+            services.playback.play(track: track)
+        }
+    }
+    
+    func deleteTrack(_ track: Track) {
+        guard let id = track.trackId else { return }
+        Task {
+            try? await services.database.deleteTrack(trackId: id)
+            // Post update
+            await MainActor.run { libraryStore.loadTracks() }
+        }
+    }
+    
+    func deleteFile(_ track: Track) {
+        Task {
+            do {
+                try FileManager.default.trashItem(at: track.url, resultingItemURL: nil)
+                if let id = track.trackId {
+                    try await services.database.deleteTrack(trackId: id)
+                    await MainActor.run { libraryStore.loadTracks() }
+                }
+            } catch {
+                print("Error deleting file: \(error)")
             }
         }
     }
+    
+
+
+
 }
+

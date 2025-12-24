@@ -8,7 +8,7 @@ struct LibraryArtistsView: View {
         ScrollView {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 24)], spacing: 24) {
                 ForEach(artists) { artist in
-                    NavigationLink(destination: ArtistDetailView(artist: artist)) {
+                    NavigationLink(value: artist) {
                         ArtistGridItem(artist: artist)
                     }
                     .buttonStyle(.plain)
@@ -17,6 +17,7 @@ struct LibraryArtistsView: View {
             .padding(24)
         }
         .navigationTitle("Artists")
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .nowPlayingBarPadding()
         .background(Theme.background)
         .task {
@@ -50,13 +51,12 @@ struct ArtistGridItem: View {
                     .lineLimit(1)
                     .foregroundStyle(.primary)
                 
-                Text("\(artist.tracks.count) Songs")
+                Text("\(artist.trackCount) Songs")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
         }
         .padding()
-        .drawingGroup() // Optimize rendering
         .contentShape(Rectangle()) // Make tappable area larger if needed
     }
 }

@@ -79,15 +79,9 @@ struct TrackArtworkView: View {
         artworkImage = nil
         guard let track else { return }
         
-        if let url = await AppServices.shared.metadata.loadArtwork(for: track) {
-            // Load and decode image in background to prevent scrolling hitch
-            let image = await Task.detached(priority: .userInitiated) {
-                return NSImage(contentsOf: url)
-            }.value
-            
-            if let image {
-                self.artworkImage = image
-            }
+        if let data = await AppServices.shared.database.getArtwork(for: track),
+           let image = NSImage(data: data) {
+            self.artworkImage = image
         }
     }
 }
@@ -128,17 +122,21 @@ struct SongGridItem: View {
             }
             
             Button {
-                 Task {
-                     await services.database.toggleFavorite(for: track.id)
-                     NotificationCenter.default.post(name: .libraryDidUpdate, object: nil)
-                 }
-            } label: {
+                  Task {
+                      if let id = track.trackId {
+                          try? await services.database.toggleFavorite(for: id)
+                          NotificationCenter.default.post(name: .libraryDidUpdate, object: nil)
+                      }
+                  }
+             } label: {
                 Label(track.isFavorite ? "Unfavorite" : "Favorite", systemImage: track.isFavorite ? "heart.slash" : "heart")
             }
             
             if let playlistContext = playlistContext {
                 Button(role: .destructive) {
-                    playlists.remove(tracks: [track.id], from: playlistContext)
+                    if let id = track.trackId {
+                        playlists.remove(tracks: [id], from: playlistContext)
+                    }
                 } label: {
                     Label("Remove from Playlist", systemImage: "trash")
                 }
@@ -148,15 +146,15 @@ struct SongGridItem: View {
             Menu("Add to Playlist") {
                 ForEach(playlists.playlists.filter { $0.id != playlistContext }) { playlist in
                     Button(playlist.name) {
-                        playlists.add(tracks: [track.id], to: playlist.id)
+                        if let id = track.trackId {
+                            playlists.add(tracks: [id], to: playlist.id)
+                        }
                     }
                 }
                 Divider()
                 Button("New Playlist...") {
-                    // This creates an empty playlist for now, ideally shows a prompt but context menu limitations apply
-                    // We can trigger a sheet via a binding in the parent view if needed, or just create it.
-                    // For now, let's create a generic "New Playlist"
-                    if let _ = playlists.create(name: "New Playlist", trackIDs: [track.id]) {
+                    if let id = track.trackId,
+                       let _ = playlists.create(name: "New Playlist", trackIDs: [id]) {
                         
                     }
                 }

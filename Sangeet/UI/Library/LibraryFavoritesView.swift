@@ -5,48 +5,61 @@ struct LibraryFavoritesView: View {
     @State private var tracks: [Track] = []
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Favorites")
-                .font(.largeTitle.bold())
-                .padding(.horizontal)
-            
-            if !tracks.isEmpty {
-                Button(action: playAllFavorites) {
-                    Image(systemName: "play.circle.fill")
-                        .font(.system(size: 48))
-                        .foregroundStyle(Theme.accent)
-                }
-                .buttonStyle(.plain)
-                .padding(.horizontal)
-            }
+        VStack(alignment: .leading, spacing: 0) {
+            // Header Title (Always Visible or part of content?)
+            // To mimic other views, we'll put it inside the scroll/content areas or keep it fixed.
+            // Let's keep it consistent: Content moves.
             
             if tracks.isEmpty {
-                ContentUnavailableView("No Favorites", systemImage: "heart", description: Text("Mark songs as favorite to see them here."))
-                    .glassCard()
-                    .padding(.horizontal)
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Favorites")
+                        .font(.largeTitle.bold())
+                        .padding(.horizontal, 24)
+                        .padding(.top, 24)
+                    
+                    ContentUnavailableView("No Favorites", systemImage: "heart", description: Text("Mark songs as favorite to see them here."))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
             } else {
                 ScrollView {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 20)], spacing: 20) {
-                        ForEach(tracks) { track in
-                            SongGridItem(track: track)
-                                .onTapGesture {
-                                    playAndQueue(track)
-                                }
-                                .contextMenu {
-                                    Button("Remove from Favorites") {
-                                        Task {
-                                            await services.database.toggleFavorite(for: track.id)
-                                            loadFavorites()
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Favorites")
+                            .font(.largeTitle.bold())
+                            .padding(.horizontal)
+                        
+                        Button(action: playAllFavorites) {
+                            Image(systemName: "play.circle.fill")
+                                .font(.system(size: 48))
+                                .foregroundStyle(Theme.accent)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal)
+                        
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 20)], spacing: 20) {
+                            ForEach(tracks) { track in
+                                SongGridItem(track: track)
+                                    .onTapGesture {
+                                        playAndQueue(track)
+                                    }
+                                    .contextMenu {
+                                        Button("Remove from Favorites") {
+                                            Task {
+                                                if let id = track.trackId {
+                                                    try? await services.database.toggleFavorite(for: id)
+                                                    loadFavorites()
+                                                }
+                                            }
                                         }
                                     }
-                                }
+                            }
                         }
+                        .padding()
                     }
-                    .padding()
+                    .padding(.top, 24)
                 }
             }
         }
-        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .nowPlayingBarPadding()
         .background(Theme.background)
         .task {
@@ -55,16 +68,13 @@ struct LibraryFavoritesView: View {
         .onReceive(NotificationCenter.default.publisher(for: .libraryDidUpdate)) { _ in
             loadFavorites()
         }
+        .navigationBarBackButtonHidden(true)
     }
     
     func loadFavorites() {
         Task { @MainActor in
             do {
-                // We need to implement fetchFavorites in DatabaseService
-                // Using a temporary filter on fetchAll for now if specific method doesn't exist
-                // check DatabaseService... it has toggleFavorite but maybe not fetchFavorites
-                let all = try await services.database.fetchAllTracks()
-                self.tracks = all.filter { $0.isFavorite }
+                self.tracks = try await services.database.fetchFavorites()
             } catch {
                 print("Error loading favorites: \(error)")
             }
@@ -79,14 +89,14 @@ struct LibraryFavoritesView: View {
     
     private func playAllFavorites() {
         guard let first = tracks.first else { return }
-        services.playback.play(first)
+        services.playback.play(track: first)
         for track in tracks.dropFirst() {
             services.playback.addToQueue(track)
         }
     }
 
     private func playAndQueue(_ track: Track) {
-        services.playback.play(track)
+        services.playback.play(track: track)
         if let index = tracks.firstIndex(where: { $0.id == track.id }) {
             let nextTracks = tracks.dropFirst(index + 1)
             for t in nextTracks {

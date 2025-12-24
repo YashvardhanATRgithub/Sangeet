@@ -9,31 +9,35 @@ struct PlaylistDetailView: View {
     @State private var playlistName = "Playlist"
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(playlistName)
                         .font(.largeTitle.bold())
                     Text("\(tracks.count) songs")
                         .foregroundStyle(.secondary)
                 }
-                Spacer()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                
                 if !tracks.isEmpty {
                     Button(action: playPlaylist) {
                         Image(systemName: "play.circle.fill")
-                            .font(.system(size: 48))
-                            .foregroundStyle(Theme.accent)
+                        // ...
                     }
                     .buttonStyle(.plain)
-                    .padding(.trailing, 8)
+                    .padding(.leading, 6)
                 }
-            }
-            
-            if tracks.isEmpty {
-                ContentUnavailableView("No Songs", systemImage: "music.note", description: Text("Add tracks to this playlist to start playing."))
-                    .glassCard()
-            } else {
-                ScrollView {
+                
+                if tracks.isEmpty {
+                     // Center the empty state vertically in the remaining space
+                     VStack {
+                         Spacer()
+                         ContentUnavailableView("No Songs", systemImage: "music.note", description: Text("Add tracks to this playlist to start playing."))
+                            .glassCard()
+                         Spacer()
+                     }
+                     .frame(minHeight: 400) // Ensure it takes up space
+                } else {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 20)], spacing: 20) {
                         ForEach(tracks) { track in
                             SongGridItem(track: track, playlistContext: playlistID)
@@ -42,11 +46,11 @@ struct PlaylistDetailView: View {
                                 }
                         }
                     }
-                    .padding()
                 }
             }
+            .padding(24)
         }
-        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .nowPlayingBarPadding()
         .background(Theme.background)
         .task(id: playlistID) {
@@ -58,6 +62,7 @@ struct PlaylistDetailView: View {
         .onReceive(NotificationCenter.default.publisher(for: .libraryDidUpdate)) { _ in
             Task { await loadPlaylist() }
         }
+        .navigationBarBackButtonHidden(true)
     }
     
     @MainActor
@@ -72,7 +77,13 @@ struct PlaylistDetailView: View {
         
         do {
             let allTracks = try await services.database.fetchAllTracks()
-            let trackLookup = Dictionary(uniqueKeysWithValues: allTracks.map { ($0.id, $0) })
+            // Map by trackId (Int64)
+            var trackLookup: [Int64: Track] = [:]
+            for track in allTracks {
+                if let id = track.trackId {
+                    trackLookup[id] = track
+                }
+            }
             tracks = playlist.trackIDs.compactMap { trackLookup[$0] }
         } catch {
             print("Failed to load playlist tracks: \(error)")
@@ -90,12 +101,9 @@ struct PlaylistDetailView: View {
     }
     
     private func playAndQueue(_ track: Track) {
-        services.playback.play(track)
         if let index = tracks.firstIndex(where: { $0.id == track.id }) {
-            let nextTracks = tracks.dropFirst(index + 1)
-            for t in nextTracks {
-                services.playback.addToQueue(t)
-            }
+            let queue = Array(tracks.dropFirst(index))
+            services.playback.startPlaylist(queue)
         }
     }
 }

@@ -3,9 +3,26 @@ import SwiftUI
 struct ArtistDetailView: View {
     let artist: Artist
     @EnvironmentObject var services: AppServices
+    @Environment(\.dismiss) private var dismiss
     
+    @State private var tracks: [Track] = []
+    @State private var isLoading = true
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            // Back Button (Manual)
+            Button(action: { dismiss() }) {
+                Image(systemName: "chevron.left")
+                     .font(.system(size: 20, weight: .medium))
+                     .foregroundStyle(.secondary)
+                     .padding(8)
+                     .background(
+                         Circle().fill(Color.primary.opacity(0.05))
+                     )
+            }
+            .buttonStyle(.plain)
+            .padding(.leading, 4)
+            
             header
             
             Button(action: playAll) {
@@ -16,14 +33,17 @@ struct ArtistDetailView: View {
             .buttonStyle(.plain)
             .padding(.leading, 6)
             
-            if artist.tracks.isEmpty {
+            if isLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if tracks.isEmpty {
                 ContentUnavailableView("No songs", systemImage: "music.note", description: Text("Add tracks for \(artist.name) to see them here."))
                     .glassCard()
             } else {
 
                 ScrollView {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 20)], spacing: 20) {
-                        ForEach(artist.tracks) { track in
+                        ForEach(tracks) { track in
                             SongGridItem(track: track)
                                 .onTapGesture {
                                     playAndQueue(track)
@@ -44,7 +64,12 @@ struct ArtistDetailView: View {
         .padding()
         .nowPlayingBarPadding()
         .background(Theme.background)
-        .navigationTitle(artist.name)
+        .navigationBarBackButtonHidden(true)
+        .task {
+            isLoading = true
+            await loadTracks()
+            isLoading = false
+        }
     }
     
     private var header: some View {
@@ -60,7 +85,7 @@ struct ArtistDetailView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(artist.name)
                     .font(.title2.bold())
-                Text("\(artist.tracks.count) songs")
+                Text("\(tracks.count) songs")
                     .foregroundStyle(.secondary)
             }
             Spacer()
@@ -68,12 +93,16 @@ struct ArtistDetailView: View {
         .glassCard()
     }
     
-    private func playAll() {
-        guard let first = artist.tracks.first else { return }
-        services.playback.play(first)
-        for track in artist.tracks.dropFirst() {
-            services.playback.addToQueue(track)
+    func loadTracks() async {
+        do {
+            self.tracks = try await services.database.getTracks(for: artist)
+        } catch {
+            print("Failed to load artist tracks: \(error)")
         }
+    }
+    
+    private func playAll() {
+        services.playback.startPlaylist(tracks)
     }
     
     private func formatDuration(_ duration: TimeInterval) -> String {
@@ -83,12 +112,9 @@ struct ArtistDetailView: View {
     }
     
     private func playAndQueue(_ track: Track) {
-        services.playback.play(track)
-        if let index = artist.tracks.firstIndex(where: { $0.id == track.id }) {
-            let nextTracks = artist.tracks.dropFirst(index + 1)
-            for t in nextTracks {
-                 services.playback.addToQueue(t)
-            }
+        if let index = tracks.firstIndex(where: { $0.id == track.id }) {
+            let queue = Array(tracks.dropFirst(index))
+            services.playback.startPlaylist(queue)
         }
     }
 }

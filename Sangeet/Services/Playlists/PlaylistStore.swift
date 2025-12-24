@@ -15,7 +15,7 @@ final class PlaylistStore: ObservableObject {
         load()
     }
     
-    func create(name: String, trackIDs: [UUID] = []) -> UUID? {
+    func create(name: String, trackIDs: [Int64] = []) -> UUID? {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
         
@@ -46,7 +46,7 @@ final class PlaylistStore: ObservableObject {
         NotificationCenter.default.post(name: .libraryDidUpdate, object: nil)
     }
     
-    func add(tracks: [UUID], to playlistID: UUID) {
+    func add(tracks: [Int64], to playlistID: UUID) {
         guard let index = playlists.firstIndex(where: { $0.id == playlistID }) else { return }
         let existing = Set(playlists[index].trackIDs)
         let additions = tracks.filter { !existing.contains($0) }
@@ -56,7 +56,7 @@ final class PlaylistStore: ObservableObject {
         NotificationCenter.default.post(name: .libraryDidUpdate, object: nil)
     }
     
-    func remove(tracks: [UUID], from playlistID: UUID) {
+    func remove(tracks: [Int64], from playlistID: UUID) {
         guard let index = playlists.firstIndex(where: { $0.id == playlistID }) else { return }
         let removal = Set(tracks)
         playlists[index].trackIDs.removeAll { removal.contains($0) }
@@ -83,6 +83,6 @@ final class PlaylistStore: ObservableObject {
 struct StoredPlaylist: Identifiable, Codable, Hashable {
     var id: UUID
     var name: String
-    var trackIDs: [UUID]
+    var trackIDs: [Int64]
     var dateCreated: Date
 }

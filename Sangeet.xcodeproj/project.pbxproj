@@ -6,6 +6,33 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		62E81C712EFBCF8F00A52E1F /* Bass in Frameworks */ = {isa = PBXBuildFile; productRef = 62E81C702EFBCF8F00A52E1F /* Bass */; };
+		62E81C732EFBCF8F00A52E1F /* BassApe in Frameworks */ = {isa = PBXBuildFile; productRef = 62E81C722EFBCF8F00A52E1F /* BassApe */; };
+		62E81C752EFBCF8F00A52E1F /* BassDSD in Frameworks */ = {isa = PBXBuildFile; productRef = 62E81C742EFBCF8F00A52E1F /* BassDSD */; };
+		62E81C772EFBCF8F00A52E1F /* BassENC in Frameworks */ = {isa = PBXBuildFile; productRef = 62E81C762EFBCF8F00A52E1F /* BassENC */; };
+		62E81C792EFBCF8F00A52E1F /* BassENC.FLAC in Frameworks */ = {isa = PBXBuildFile; productRef = 62E81C782EFBCF8F00A52E1F /* BassENC.FLAC */; };
+		62E81C7B2EFBCF8F00A52E1F /* BassENC.MP3 in Frameworks */ = {isa = PBXBuildFile; productRef = 62E81C7A2EFBCF8F00A52E1F /* BassENC.MP3 */; };
+		62E81C7D2EFBCF8F00A52E1F /* BassENC.OGG in Frameworks */ = {isa = PBXBuildFile; productRef = 62E81C7C2EFBCF8F00A52E1F /* BassENC.OGG */; };
+		62E81C7F2EFBCF8F00A52E1F /* BassENC.Opus in Frameworks */ = {isa = PBXBuildFile; productRef = 62E81C7E2EFBCF8F00A52E1F /* BassENC.Opus */; };
+		62E81C812EFBCF8F00A52E1F /* BassFLAC in Frameworks */ = {isa = PBXBuildFile; productRef = 62E81C802EFBCF8F00A52E1F /* BassFLAC */; };
+		62E81C832EFBCF8F00A52E1F /* BassFX in Frameworks */ = {isa = PBXBuildFile; productRef = 62E81C822EFBCF8F00A52E1F /* BassFX */; };
+		62E81C852EFBCF8F00A52E1F /* BassHLS in Frameworks */ = {isa = PBXBuildFile; productRef = 62E81C842EFBCF8F00A52E1F /* BassHLS */; };
+		62E81C872EFBCF8F00A52E1F /* BassLoud in Frameworks */ = {isa = PBXBuildFile; productRef = 62E81C862EFBCF8F00A52E1F /* BassLoud */; };
+		62E81C892EFBCF8F00A52E1F /* BassMIDI in Frameworks */ = {isa = PBXBuildFile; productRef = 62E81C882EFBCF8F00A52E1F /* BassMIDI */; };
+		62E81C8B2EFBCF8F00A52E1F /* BassMPC in Frameworks */ = {isa = PBXBuildFile; productRef = 62E81C8A2EFBCF8F00A52E1F /* BassMPC */; };
+		62E81C8D2EFBCF8F00A52E1F /* BassMix in Frameworks */ = {isa = PBXBuildFile; productRef = 62E81C8C2EFBCF8F00A52E1F /* BassMix */; };
+		62E81C8F2EFBCF8F00A52E1F /* BassOpus in Frameworks */ = {isa = PBXBuildFile; productRef = 62E81C8E2EFBCF8F00A52E1F /* BassOpus */; };
+		62E81C912EFBCF8F00A52E1F /* BassSPX in Frameworks */ = {isa = PBXBuildFile; productRef = 62E81C902EFBCF8F00A52E1F /* BassSPX */; };
+		62E81C932EFBCF8F00A52E1F /* BassTTA in Frameworks */ = {isa = PBXBuildFile; productRef = 62E81C922EFBCF8F00A52E1F /* BassTTA */; };
+		62E81C952EFBCF8F00A52E1F /* BassVST in Frameworks */ = {isa = PBXBuildFile; productRef = 62E81C942EFBCF8F00A52E1F /* BassVST */; };
+		62E81C972EFBCF8F00A52E1F /* BassWV in Frameworks */ = {isa = PBXBuildFile; productRef = 62E81C962EFBCF8F00A52E1F /* BassWV */; };
+		62E81C992EFBCF8F00A52E1F /* BassWebM in Frameworks */ = {isa = PBXBuildFile; productRef = 62E81C982EFBCF8F00A52E1F /* BassWebM */; };
+		62E81C9B2EFBCF8F00A52E1F /* CBass in Frameworks */ = {isa = PBXBuildFile; productRef = 62E81C9A2EFBCF8F00A52E1F /* CBass */; };
+		62E81C9D2EFBCF8F00A52E1F /* Tags in Frameworks */ = {isa = PBXBuildFile; productRef = 62E81C9C2EFBCF8F00A52E1F /* Tags */; };
+		62E81E6E2EFC024B00A52E1F /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 62E81E6D2EFC024B00A52E1F /* GRDB */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		62481C7D2EF8A05C0009B96E /* Sangeet.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Sangeet.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +50,30 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				62E81C972EFBCF8F00A52E1F /* BassWV in Frameworks */,
+				62E81C7F2EFBCF8F00A52E1F /* BassENC.Opus in Frameworks */,
+				62E81C752EFBCF8F00A52E1F /* BassDSD in Frameworks */,
+				62E81E6E2EFC024B00A52E1F /* GRDB in Frameworks */,
+				62E81C7D2EFBCF8F00A52E1F /* BassENC.OGG in Frameworks */,
+				62E81C952EFBCF8F00A52E1F /* BassVST in Frameworks */,
+				62E81C932EFBCF8F00A52E1F /* BassTTA in Frameworks */,
+				62E81C732EFBCF8F00A52E1F /* BassApe in Frameworks */,
+				62E81C7B2EFBCF8F00A52E1F /* BassENC.MP3 in Frameworks */,
+				62E81C872EFBCF8F00A52E1F /* BassLoud in Frameworks */,
+				62E81C992EFBCF8F00A52E1F /* BassWebM in Frameworks */,
+				62E81C832EFBCF8F00A52E1F /* BassFX in Frameworks */,
+				62E81C9B2EFBCF8F00A52E1F /* CBass in Frameworks */,
+				62E81C912EFBCF8F00A52E1F /* BassSPX in Frameworks */,
+				62E81C772EFBCF8F00A52E1F /* BassENC in Frameworks */,
+				62E81C9D2EFBCF8F00A52E1F /* Tags in Frameworks */,
+				62E81C8F2EFBCF8F00A52E1F /* BassOpus in Frameworks */,
+				62E81C892EFBCF8F00A52E1F /* BassMIDI in Frameworks */,
+				62E81C8D2EFBCF8F00A52E1F /* BassMix in Frameworks */,
+				62E81C852EFBCF8F00A52E1F /* BassHLS in Frameworks */,
+				62E81C8B2EFBCF8F00A52E1F /* BassMPC in Frameworks */,
+				62E81C812EFBCF8F00A52E1F /* BassFLAC in Frameworks */,
+				62E81C792EFBCF8F00A52E1F /* BassENC.FLAC in Frameworks */,
+				62E81C712EFBCF8F00A52E1F /* Bass in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -33,6 +84,7 @@
 			isa = PBXGroup;
 			children = (
 				62481C7F2EF8A05C0009B96E /* Sangeet */,
+				62E81E692EFBFD2600A52E1F /* Frameworks */,
 				62481C7E2EF8A05C0009B96E /* Products */,
 			);
 			sourceTree = "<group>";
@@ -43,6 +95,13 @@
 				62481C7D2EF8A05C0009B96E /* Sangeet.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		62E81E692EFBFD2600A52E1F /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -65,6 +124,30 @@
 			);
 			name = Sangeet;
 			packageProductDependencies = (
+				62E81C702EFBCF8F00A52E1F /* Bass */,
+				62E81C722EFBCF8F00A52E1F /* BassApe */,
+				62E81C742EFBCF8F00A52E1F /* BassDSD */,
+				62E81C762EFBCF8F00A52E1F /* BassENC */,
+				62E81C782EFBCF8F00A52E1F /* BassENC.FLAC */,
+				62E81C7A2EFBCF8F00A52E1F /* BassENC.MP3 */,
+				62E81C7C2EFBCF8F00A52E1F /* BassENC.OGG */,
+				62E81C7E2EFBCF8F00A52E1F /* BassENC.Opus */,
+				62E81C802EFBCF8F00A52E1F /* BassFLAC */,
+				62E81C822EFBCF8F00A52E1F /* BassFX */,
+				62E81C842EFBCF8F00A52E1F /* BassHLS */,
+				62E81C862EFBCF8F00A52E1F /* BassLoud */,
+				62E81C882EFBCF8F00A52E1F /* BassMIDI */,
+				62E81C8A2EFBCF8F00A52E1F /* BassMPC */,
+				62E81C8C2EFBCF8F00A52E1F /* BassMix */,
+				62E81C8E2EFBCF8F00A52E1F /* BassOpus */,
+				62E81C902EFBCF8F00A52E1F /* BassSPX */,
+				62E81C922EFBCF8F00A52E1F /* BassTTA */,
+				62E81C942EFBCF8F00A52E1F /* BassVST */,
+				62E81C962EFBCF8F00A52E1F /* BassWV */,
+				62E81C982EFBCF8F00A52E1F /* BassWebM */,
+				62E81C9A2EFBCF8F00A52E1F /* CBass */,
+				62E81C9C2EFBCF8F00A52E1F /* Tags */,
+				62E81E6D2EFC024B00A52E1F /* GRDB */,
 			);
 			productName = Sangeet;
 			productReference = 62481C7D2EF8A05C0009B96E /* Sangeet.app */;
@@ -94,6 +177,10 @@
 			);
 			mainGroup = 62481C742EF8A05C0009B96E;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				62E81C6F2EFBCF8F00A52E1F /* XCRemoteSwiftPackageReference "CBass" */,
+				62E81E6C2EFC024B00A52E1F /* XCRemoteSwiftPackageReference "GRDB.swift" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 62481C7E2EF8A05C0009B96E /* Products */;
 			projectDirPath = "";
@@ -252,7 +339,17 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_APP_SANDBOX = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -282,7 +379,17 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_APP_SANDBOX = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -325,6 +432,148 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		62E81C6F2EFBCF8F00A52E1F /* XCRemoteSwiftPackageReference "CBass" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Treata11/CBass";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
+		62E81E6C2EFC024B00A52E1F /* XCRemoteSwiftPackageReference "GRDB.swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/groue/GRDB.swift.git";
+			requirement = {
+				branch = master;
+				kind = branch;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		62E81C702EFBCF8F00A52E1F /* Bass */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 62E81C6F2EFBCF8F00A52E1F /* XCRemoteSwiftPackageReference "CBass" */;
+			productName = Bass;
+		};
+		62E81C722EFBCF8F00A52E1F /* BassApe */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 62E81C6F2EFBCF8F00A52E1F /* XCRemoteSwiftPackageReference "CBass" */;
+			productName = BassApe;
+		};
+		62E81C742EFBCF8F00A52E1F /* BassDSD */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 62E81C6F2EFBCF8F00A52E1F /* XCRemoteSwiftPackageReference "CBass" */;
+			productName = BassDSD;
+		};
+		62E81C762EFBCF8F00A52E1F /* BassENC */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 62E81C6F2EFBCF8F00A52E1F /* XCRemoteSwiftPackageReference "CBass" */;
+			productName = BassENC;
+		};
+		62E81C782EFBCF8F00A52E1F /* BassENC.FLAC */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 62E81C6F2EFBCF8F00A52E1F /* XCRemoteSwiftPackageReference "CBass" */;
+			productName = BassENC.FLAC;
+		};
+		62E81C7A2EFBCF8F00A52E1F /* BassENC.MP3 */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 62E81C6F2EFBCF8F00A52E1F /* XCRemoteSwiftPackageReference "CBass" */;
+			productName = BassENC.MP3;
+		};
+		62E81C7C2EFBCF8F00A52E1F /* BassENC.OGG */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 62E81C6F2EFBCF8F00A52E1F /* XCRemoteSwiftPackageReference "CBass" */;
+			productName = BassENC.OGG;
+		};
+		62E81C7E2EFBCF8F00A52E1F /* BassENC.Opus */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 62E81C6F2EFBCF8F00A52E1F /* XCRemoteSwiftPackageReference "CBass" */;
+			productName = BassENC.Opus;
+		};
+		62E81C802EFBCF8F00A52E1F /* BassFLAC */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 62E81C6F2EFBCF8F00A52E1F /* XCRemoteSwiftPackageReference "CBass" */;
+			productName = BassFLAC;
+		};
+		62E81C822EFBCF8F00A52E1F /* BassFX */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 62E81C6F2EFBCF8F00A52E1F /* XCRemoteSwiftPackageReference "CBass" */;
+			productName = BassFX;
+		};
+		62E81C842EFBCF8F00A52E1F /* BassHLS */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 62E81C6F2EFBCF8F00A52E1F /* XCRemoteSwiftPackageReference "CBass" */;
+			productName = BassHLS;
+		};
+		62E81C862EFBCF8F00A52E1F /* BassLoud */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 62E81C6F2EFBCF8F00A52E1F /* XCRemoteSwiftPackageReference "CBass" */;
+			productName = BassLoud;
+		};
+		62E81C882EFBCF8F00A52E1F /* BassMIDI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 62E81C6F2EFBCF8F00A52E1F /* XCRemoteSwiftPackageReference "CBass" */;
+			productName = BassMIDI;
+		};
+		62E81C8A2EFBCF8F00A52E1F /* BassMPC */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 62E81C6F2EFBCF8F00A52E1F /* XCRemoteSwiftPackageReference "CBass" */;
+			productName = BassMPC;
+		};
+		62E81C8C2EFBCF8F00A52E1F /* BassMix */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 62E81C6F2EFBCF8F00A52E1F /* XCRemoteSwiftPackageReference "CBass" */;
+			productName = BassMix;
+		};
+		62E81C8E2EFBCF8F00A52E1F /* BassOpus */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 62E81C6F2EFBCF8F00A52E1F /* XCRemoteSwiftPackageReference "CBass" */;
+			productName = BassOpus;
+		};
+		62E81C902EFBCF8F00A52E1F /* BassSPX */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 62E81C6F2EFBCF8F00A52E1F /* XCRemoteSwiftPackageReference "CBass" */;
+			productName = BassSPX;
+		};
+		62E81C922EFBCF8F00A52E1F /* BassTTA */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 62E81C6F2EFBCF8F00A52E1F /* XCRemoteSwiftPackageReference "CBass" */;
+			productName = BassTTA;
+		};
+		62E81C942EFBCF8F00A52E1F /* BassVST */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 62E81C6F2EFBCF8F00A52E1F /* XCRemoteSwiftPackageReference "CBass" */;
+			productName = BassVST;
+		};
+		62E81C962EFBCF8F00A52E1F /* BassWV */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 62E81C6F2EFBCF8F00A52E1F /* XCRemoteSwiftPackageReference "CBass" */;
+			productName = BassWV;
+		};
+		62E81C982EFBCF8F00A52E1F /* BassWebM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 62E81C6F2EFBCF8F00A52E1F /* XCRemoteSwiftPackageReference "CBass" */;
+			productName = BassWebM;
+		};
+		62E81C9A2EFBCF8F00A52E1F /* CBass */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 62E81C6F2EFBCF8F00A52E1F /* XCRemoteSwiftPackageReference "CBass" */;
+			productName = CBass;
+		};
+		62E81C9C2EFBCF8F00A52E1F /* Tags */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 62E81C6F2EFBCF8F00A52E1F /* XCRemoteSwiftPackageReference "CBass" */;
+			productName = Tags;
+		};
+		62E81E6D2EFC024B00A52E1F /* GRDB */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 62E81E6C2EFC024B00A52E1F /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			productName = GRDB;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 62481C752EF8A05C0009B96E /* Project object */;
 }

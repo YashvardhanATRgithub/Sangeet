@@ -2,9 +2,97 @@ import SwiftUI
 import AppKit
 
 struct MainView: View {
+    @ObservedObject var theme = AppTheme.shared
+    @EnvironmentObject var services: AppServices
     @State private var selection: SidebarSelection? = .home
+    // ... existing ...
+
+    // ... body ...
+    
+    // Updated Top Bar
+    private var topBar: some View {
+        HStack(spacing: 0) {
+            HStack(spacing: 16) {
+                NeonBrandingView()
+                
+                Button(action: {
+                    withAnimation {
+                        if columnVisibility == .detailOnly {
+                            columnVisibility = .all
+                        } else {
+                            columnVisibility = .detailOnly
+                        }
+                    }
+                }) {
+                    Image(systemName: "sidebar.left")
+                        .font(.system(size: 18))
+                        .foregroundStyle(columnVisibility == .all ? theme.currentTheme.primaryColor : .secondary)
+                        .padding(6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(columnVisibility == .all ? theme.currentTheme.primaryColor.opacity(0.15) : Color.clear)
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+            .layoutPriority(1)
+            .padding(.leading, 68) // Adjusted to be tighter (Standard Traffic Light width)
+            
+            Spacer()
+            
+            Spacer()
+            
+            // Search Bar (Center) - Ported from HiFidelity
+            SearchBar(
+                text: $services.searchQuery,
+                isActive: Binding(
+                    get: { selection == .search },
+                    set: { active in
+                        if active { selection = .search }
+                        else if selection == .search { selection = .home } // Go home if search deactivated
+                    }
+                )
+            )
+            
+            Spacer()
+            
+            Spacer()
+            
+            HStack(spacing: 16) {
+                 Button(action: { showQueue.toggle() }) {
+                     Image(systemName: "sidebar.right")
+                        .font(.system(size: 18))
+                        .foregroundStyle(showQueue ? theme.currentTheme.primaryColor : .secondary)
+                        .padding(6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(showQueue ? theme.currentTheme.primaryColor.opacity(0.15) : Color.clear)
+                        )
+                 }
+                 .buttonStyle(.plain)
+                 
+                 Button(action: { showingLibrarySettings = true }) {
+                     Image(systemName: "gearshape")
+                        .font(.system(size: 18))
+                        .foregroundStyle(.secondary)
+                 }
+                 .buttonStyle(.plain)
+            }
+            .layoutPriority(1)
+            .padding(.trailing, 68) // Match Left Padding (Symmetry)
+        }
+        .frame(height: 68)
+        .background(Theme.background)
+        .overlay(
+            Rectangle()
+                .fill(Theme.separator)
+                .frame(height: 1),
+            alignment: .bottom
+        )
+    }
     @State private var columnVisibility = NavigationSplitViewVisibility.all
     @State private var showQueue = false
+    // @FocusState private var isSearchFocused: Bool // Removed, handled by SearchBar component
     @State private var showCommandPalette = false
     @State private var showFullScreenPlayer = false
     @State private var nowPlayingBarHeight: CGFloat = NowPlayingBarDefaults.minHeight
@@ -25,7 +113,7 @@ struct MainView: View {
                 }
                 
                 // Layer 2: Main Content
-                HStack(spacing: 0) {
+                HStack(alignment: .top, spacing: 0) {
                     // Left Sidebar (Manual)
                     if columnVisibility == .all {
                     SidebarView(selection: $selection)
@@ -75,10 +163,10 @@ struct MainView: View {
                     }
                 }
                 .animation(.easeInOut(duration: 0.3), value: selection)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading) // Prevent centering
             }
             .background(Theme.background)
-            
-            }
             
             // Layer 3: Player Bar (Always Mounted to preserve state)
             NowPlayingBar(
@@ -235,92 +323,7 @@ struct MainView: View {
         }
     }
 
-    private var topBar: some View {
-        HStack(spacing: 0) {
-            HStack(spacing: 16) {
-                NeonBrandingView()
-                
-                Button(action: {
-                    withAnimation {
-                        if columnVisibility == .detailOnly {
-                            columnVisibility = .all
-                        } else {
-                            columnVisibility = .detailOnly
-                        }
-                    }
-                }) {
-                    Image(systemName: "sidebar.left")
-                        .font(.system(size: 18))
-                        .foregroundStyle(columnVisibility == .all ? Theme.accent : .secondary)
-                        .padding(6)
-                        .background(
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(columnVisibility == .all ? Theme.accent.opacity(0.15) : Color.clear)
-                        )
-                }
-                .buttonStyle(.plain)
-            }
-            .layoutPriority(1)
-            .padding(.leading, 68) // Adjusted to be tighter (Standard Traffic Light width)
-            
-            Spacer()
-            
-            // Search Bar (Center)
-            HStack(spacing: 12) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
-                
-                Text("What do you want to play?")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
-                
-                Spacer()
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .frame(minWidth: 200, maxWidth: 400) // Flexible width
-            .frame(height: 36)
-            .background(Color.black.opacity(0.2))
-            .cornerRadius(8)
-            .onTapGesture {
-                selection = .search
-            }
-            
-            Spacer()
-            
-            HStack(spacing: 16) {
-                 Button(action: { showQueue.toggle() }) {
-                     Image(systemName: "sidebar.right")
-                        .font(.system(size: 18))
-                        .foregroundStyle(showQueue ? Theme.accent : .secondary)
-                        .padding(6)
-                        .background(
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(showQueue ? Theme.accent.opacity(0.15) : Color.clear)
-                        )
-                 }
-                 .buttonStyle(.plain)
-                 
-                 Button(action: { showingLibrarySettings = true }) {
-                     Image(systemName: "gearshape")
-                        .font(.system(size: 18))
-                        .foregroundStyle(.secondary)
-                 }
-                 .buttonStyle(.plain)
-            }
-            .layoutPriority(1)
-            .padding(.trailing, 68) // Match Left Padding (Symmetry)
-        }
-        .frame(height: 68)
-        .background(Theme.background)
-        .overlay(
-            Rectangle()
-                .fill(Theme.separator)
-                .frame(height: 1),
-            alignment: .bottom
-        )
-    }
+
     
     private func applyBaseWindowStyleIfNeeded() {
         guard !didApplyBaseWindowStyle else { return }

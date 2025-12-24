@@ -47,6 +47,47 @@ final class LibraryAccessStore {
         }
     }
     
+    func removeBookmarks(for urls: [URL]) {
+        let targets = Set(urls.map { $0.standardizedFileURL })
+        
+        // Stop accessing
+        for url in targets {
+            if activeURLs.contains(url) {
+                url.stopAccessingSecurityScopedResource()
+                activeURLs.remove(url)
+            }
+        }
+        
+        // Remove from storage
+        let storedData = loadBookmarkData()
+        _ = resolveBookmarks(storedData, refreshIfStale: false)
+        
+        var newDataList: [Data] = []
+        // We have to iterate resolved URLs and keep their index in data list? 
+        // Or simpler: Re-serialize all EXCEPT the targets.
+        // Re-serializing existing bookmarks might invalidate them if we don't have the original URL access?
+        // Actually, we just filter the original data list by resolving each one and checking if it matches a target.
+        
+        for data in storedData {
+            var isStale = false
+            if let url = try? URL(resolvingBookmarkData: data, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &isStale).standardizedFileURL {
+                if !targets.contains(url) {
+                    newDataList.append(data)
+                }
+            } else {
+                // Keep broken bookmarks? Maybe safer to drop them if we are cleaning up, but safe default is keep.
+                newDataList.append(data)
+            }
+        }
+        
+        UserDefaults.standard.set(newDataList, forKey: bookmarksKey)
+    }
+    
+    func removeAll() {
+        stopAccessingAll()
+        UserDefaults.standard.removeObject(forKey: bookmarksKey)
+    }
+    
     func bookmarkedURLs(refreshIfStale: Bool = true) -> [URL] {
         let dataList = loadBookmarkData()
         let resolved = resolveBookmarks(dataList, refreshIfStale: refreshIfStale)

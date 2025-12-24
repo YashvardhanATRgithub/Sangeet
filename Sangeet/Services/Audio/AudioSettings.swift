@@ -1,8 +1,8 @@
 //
 //  AudioSettings.swift
-//  Sangeet
+//  HiFidelity
 //
-//  Ported from HiFidelity
+//  Created by Varun Rathod on 15/11/25.
 //
 
 import Foundation
@@ -84,4 +84,5 @@ class AudioSettings: ObservableObject {
         
         Logger.info("Audio settings reset to defaults")
     }
+    
 }

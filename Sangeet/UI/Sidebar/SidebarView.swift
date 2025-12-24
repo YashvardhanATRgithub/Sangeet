@@ -3,50 +3,52 @@ import SwiftUI
 struct SidebarView: View {
     @Binding var selection: SidebarSelection?
     @EnvironmentObject var playlists: PlaylistStore
+    @ObservedObject var theme = AppTheme.shared
     @State private var showingNewPlaylist = false
     @State private var newPlaylistName = ""
     
     var body: some View {
-        List(selection: $selection) {
-            Section {
-                Label("Home", systemImage: "house").tag(SidebarSelection.home)
-                Label("Search", systemImage: "magnifyingglass").tag(SidebarSelection.search)
-            }
-            
-            Section("Library") {
-                Label("Songs", systemImage: "music.note").tag(SidebarSelection.songs)
-                Label("Albums", systemImage: "square.stack").tag(SidebarSelection.albums)
-                Label("Artists", systemImage: "music.mic").tag(SidebarSelection.artists)
-            }
-            
-            Section {
-                Label("Favorites", systemImage: "heart.fill").tag(SidebarSelection.favorites)
-                ForEach(playlists.playlists) { playlist in
-                    Label(playlist.name, systemImage: "music.note.list")
-                        .tag(SidebarSelection.playlist(playlist.id))
+        ScrollView {
+            VStack(spacing: 2) {
+                // Main Links
+                Group {
+                    sidebarItem(title: "Home", icon: "house.fill", selection: .home)
                 }
-            } header: {
-                HStack {
-                    Text("Playlists")
-                        .font(.headline)
-                    Spacer()
-                    Button(action: { showingNewPlaylist = true }) {
-                        Image(systemName: "plus.circle")
-                            .font(.title3)
-                            .foregroundStyle(.secondary)
-                            .padding(4)
+                
+                // Library
+                VStack(spacing: 2) {
+                    sectionHeader("Library")
+                    sidebarItem(title: "Songs", icon: "music.note", selection: .songs)
+                    sidebarItem(title: "Albums", icon: "square.stack.fill", selection: .albums)
+                    sidebarItem(title: "Artists", icon: "music.mic", selection: .artists)
+                }
+                
+                // Playlists
+                VStack(spacing: 2) {
+                    HStack {
+                        sectionHeader("Playlists")
+                        Spacer()
+                        Button(action: { showingNewPlaylist = true }) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.trailing, 20)
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("New Playlist")
-                    .padding(.trailing, 4)
+                    
+                    sidebarItem(title: "Favorites", icon: "heart.fill", selection: .favorites)
+                    
+                    ForEach(playlists.playlists) { playlist in
+                        sidebarItem(title: playlist.name, icon: "music.note.list", selection: .playlist(playlist.id))
+                    }
                 }
-                .padding(.vertical, 4)
             }
+            .padding(.top, 12)
+            .padding(.bottom, 90)
         }
-        .listStyle(.sidebar)
-        .frame(minWidth: 200)
-        .scrollContentBackground(.hidden)
-        .background(Theme.background)
+        .frame(minWidth: 200, maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.black.opacity(0.02))
         .alert("New Playlist", isPresented: $showingNewPlaylist) {
             TextField("Playlist name", text: $newPlaylistName)
             Button("Create") {
@@ -62,4 +64,49 @@ struct SidebarView: View {
             Text("Give your playlist a name.")
         }
     }
+    
+    @ViewBuilder
+    private func sidebarItem(title: String, icon: String, selection: SidebarSelection) -> some View {
+        let isSelected = self.selection == selection
+        
+        Button(action: { self.selection = selection }) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 16))
+                    .frame(width: 20)
+                    .foregroundStyle(isSelected ? theme.currentTheme.primaryColor : Color.secondary)
+                
+                Text(title)
+                    .font(.system(size: 14, weight: .medium)) // HiFi: AppFonts.sidebarItem
+                    .foregroundStyle(isSelected ? theme.currentTheme.primaryColor : Color.primary) // HiFi uses Primary Color for selected text too often
+                
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(isSelected ? theme.currentTheme.primaryColor.opacity(0.1) : Color.clear) // HiFi Selection Style
+            )
+            .padding(.horizontal, 8)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func sectionHeader(_ title: String) -> some View {
+        HStack {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold)) // HiFi: Caption style for headers
+                .foregroundStyle(Color.secondary)
+                .textCase(.uppercase)
+                .padding(.horizontal, 12) // Aligned with items (12px padding inside item)
+            Spacer()
+        }
+        .padding(.top, 16)
+        .padding(.bottom, 6)
+        .padding(.horizontal, 8) // Match item outer padding
+    }
+    
+
 }

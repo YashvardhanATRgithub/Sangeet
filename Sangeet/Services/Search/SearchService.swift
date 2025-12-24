@@ -1,7 +1,7 @@
 import Foundation
 
 class SearchService {
-    private let database: DatabaseLayer
+    private let database: DatabaseManager
     
     // In-memory index: [Term: [TrackID]] or just valid list of SearchItems
     private struct SearchItem {
@@ -12,18 +12,29 @@ class SearchService {
     
     private var items: [SearchItem] = []
     
-    init(database: DatabaseLayer) {
+    init(database: DatabaseManager) {
         self.database = database
     }
     
     func buildIndex() async {
         do {
-            let tracks = try await database.fetchAllTracks()
+            // Use getAllTracks() from DatabaseManager
+            let tracks = try await database.getAllTracks()
             self.items = tracks.map { track in
-                SearchItem(id: track.id, text: track.searchKeywords, score: track.playCount)
+                // Manually construct search keywords since Track doesn't calculate it
+                let keywords = [
+                    track.title,
+                    track.artist,
+                    track.album,
+                    track.albumArtist ?? "",
+                    track.composer
+                ].joined(separator: " ").lowercased()
+                
+                return SearchItem(id: track.id, text: keywords, score: track.playCount)
             }
+            Logger.info("Search index built with \(items.count) tracks")
         } catch {
-            print("Failed to build search index: \(error)")
+            Logger.error("Failed to build search index: \(error)")
         }
     }
     
@@ -32,8 +43,6 @@ class SearchService {
         guard !terms.isEmpty else { return [] }
         
         // Simple linear scan of in-memory list (fast enough for 10k-50k items in Swift)
-        // Optimization: Use Trie if 100k+
-        
         return items.filter { item in
             terms.allSatisfy { term in
                 item.text.contains(term)
