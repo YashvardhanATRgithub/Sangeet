@@ -6,6 +6,7 @@ struct FullScreenPlayerView: View {
     @State private var showQueue = false
     @Binding var showLyrics: Bool
     @State private var isHoveringVolume: Bool = false
+    @ObservedObject var effects = AudioEffectsManager.shared
     
     var body: some View {
         ZStack {
@@ -230,6 +231,19 @@ struct FullScreenPlayerView: View {
                             Image(systemName: showLyrics ? "quote.bubble.fill" : "quote.bubble")
                                 .font(.title3)
                                 .foregroundStyle(showLyrics ? Theme.accent : .white.opacity(0.6))
+                        }
+                        .buttonStyle(.plain)
+                        .hoverEffect()
+
+                        Button(action: { 
+                            effects.isKaraokeEnabled.toggle() 
+                            if effects.isKaraokeEnabled {
+                                withAnimation(.spring()) { showLyrics = true }
+                            }
+                        }) {
+                            Image(systemName: effects.isKaraokeEnabled ? "music.mic" : "music.mic")
+                                .font(.title3)
+                                .foregroundStyle(effects.isKaraokeEnabled ? Theme.accent : .white.opacity(0.6))
                         }
                         .buttonStyle(.plain)
                         .hoverEffect()

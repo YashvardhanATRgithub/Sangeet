@@ -3,6 +3,7 @@ import SwiftUI
 struct NowPlayingBar: View {
     @ObservedObject var playback: PlaybackController
     @ObservedObject var theme = AppTheme.shared
+    @ObservedObject var effects = AudioEffectsManager.shared
     @Binding var showFullScreen: Bool
     var onOpenLyrics: (() -> Void)?
     var onOpenEqualizer: (() -> Void)?
@@ -221,6 +222,22 @@ struct NowPlayingBar: View {
                         Image(systemName: "slider.vertical.3")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(.secondary)
+                            .frame(width: 32, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .hoverEffect()
+                    
+                    // Karaoke
+                    Button(action: { 
+                        effects.isKaraokeEnabled.toggle()
+                        if effects.isKaraokeEnabled {
+                            onOpenLyrics?() // Opens Full Screen with Lyrics
+                        }
+                    }) {
+                        Image(systemName: effects.isKaraokeEnabled ? "music.mic" : "music.mic")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(effects.isKaraokeEnabled ? theme.currentTheme.primaryColor : .secondary)
                             .frame(width: 32, height: 44)
                             .contentShape(Rectangle())
                     }

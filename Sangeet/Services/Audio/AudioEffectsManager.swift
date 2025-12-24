@@ -58,6 +58,13 @@ class AudioEffectsManager: ObservableObject {
     // Effect handles (for removing effects later)
     private var activeEffects: [String: HFX] = [:]
     
+    // Karaoke Mode
+    @Published var isKaraokeEnabled = false {
+        didSet { if !isLoadingSettings { toggleKaraokeEffect() } }
+    }
+    private var karaokeDSP: HDSP = 0
+    private var karaokeContext: UnsafeMutablePointer<KaraokeContext>?
+    
     private var currentStream: HSTREAM = 0
     
     // Equalizer frequencies (Hz) - matching common EQ frequencies
@@ -236,6 +243,73 @@ class AudioEffectsManager: ObservableObject {
         Logger.info("Applied built-in preset: \(name)")
     }
     
+    // MARK: - Karaoke Mode
+    
+    private func toggleKaraokeEffect() {
+        if isKaraokeEnabled {
+            applyKaraoke()
+        } else {
+            removeKaraoke()
+        }
+    }
+    
+    private func applyKaraoke() {
+        guard currentStream != 0 else { return }
+        
+        // Remove existing if any
+        removeKaraoke()
+        
+        // Get stream info to determine format (Float vs Int16)
+        var info = BASS_CHANNELINFO()
+        guard BASS_ChannelGetInfo(currentStream, &info) != 0 else {
+            Logger.error("Karaoke: Failed to get stream info")
+            return
+        }
+        
+        // Only support Stereo (2 channels)
+        // If 1 channel (mono), nothing to cancel.
+        // If > 2, we could just mute center, but for now simple check.
+        guard info.chans == 2 else {
+            Logger.warning("Karaoke: Stream is not stereo (\(info.chans) chans), skipping")
+            return
+        }
+        
+        // Allocate context
+        karaokeContext = UnsafeMutablePointer<KaraokeContext>.allocate(capacity: 1)
+        karaokeContext?.pointee.channels = Int32(info.chans)
+        
+        // Check for Float DSP flag
+        let isFloat = (info.origres & DWORD(BASS_ORIGRES_FLOAT)) != 0 || (info.flags & DWORD(BASS_SAMPLE_FLOAT)) != 0
+        karaokeContext?.pointee.useFloat = isFloat
+        
+        // Add DSP
+        karaokeDSP = BASS_ChannelSetDSP(currentStream, KaraokeDSP, karaokeContext, 0)
+        
+        if karaokeDSP != 0 {
+            Logger.info("Karaoke Mode Enabled (Float: \(isFloat))")
+        } else {
+            let err = BASS_ErrorGetCode()
+            Logger.error("Karaoke: Failed to set DSP. Error: \(err)")
+            // Cleanup
+            karaokeContext?.deallocate()
+            karaokeContext = nil
+        }
+    }
+    
+    private func removeKaraoke() {
+        if karaokeDSP != 0 {
+            BASS_ChannelRemoveDSP(currentStream, karaokeDSP)
+            karaokeDSP = 0
+        }
+        
+        if let context = karaokeContext {
+            context.deallocate()
+            karaokeContext = nil
+        }
+        
+        Logger.debug("Karaoke Mode DSP Removed")
+    }
+
     // MARK: - Reverb
     
     /// Enable/disable reverb effect
@@ -361,6 +435,10 @@ class AudioEffectsManager: ObservableObject {
         
         if isReverbEnabled {
             applyReverb()
+        }
+        
+        if isKaraokeEnabled {
+            applyKaraoke()
         }
     }
     
@@ -606,5 +684,60 @@ struct CustomEQPreset: Codable, Identifiable, Equatable {
     
     static func == (lhs: CustomEQPreset, rhs: CustomEQPreset) -> Bool {
         return lhs.id == rhs.id
+    }
+}
+
+// MARK: - Karaoke DSP (Swift Implementation)
+
+struct KaraokeContext {
+    var useFloat: Bool
+    var channels: Int32
+}
+
+func KaraokeDSP(handle: HDSP, channel: DWORD, buffer: UnsafeMutableRawPointer?, length: DWORD, user: UnsafeMutableRawPointer?) {
+    guard let buffer = buffer, let user = user else { return }
+    
+    // Bind context
+    let context = user.assumingMemoryBound(to: KaraokeContext.self).pointee
+    
+    // Only support Stereo
+    if context.channels != 2 { return }
+    
+    if context.useFloat {
+        // 32-bit Float
+        let floatBuffer = buffer.assumingMemoryBound(to: Float.self)
+        let sampleCount = Int(length) / MemoryLayout<Float>.size
+        
+        var i = 0
+        while i < sampleCount {
+            let l = floatBuffer[i]
+            let r = floatBuffer[i+1]
+            
+            // Center Cancellation: Side = (L - R) * 0.5
+            let side = (l - r) * 0.5
+            
+            floatBuffer[i] = side
+            floatBuffer[i+1] = side
+            
+            i += 2
+        }
+    } else {
+        // 16-bit Integer
+        let shortBuffer = buffer.assumingMemoryBound(to: Int16.self)
+        let sampleCount = Int(length) / MemoryLayout<Int16>.size
+        
+        var i = 0
+        while i < sampleCount {
+            let l = Int32(shortBuffer[i])
+            let r = Int32(shortBuffer[i+1])
+            
+            // Center Cancellation: Side = (L - R) / 2
+            let side = Int16((l - r) / 2)
+            
+            shortBuffer[i] = side
+            shortBuffer[i+1] = side
+            
+            i += 2
+        }
     }
 }

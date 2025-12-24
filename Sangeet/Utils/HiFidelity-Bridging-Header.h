@@ -12,4 +12,3 @@
 #import "TagLibMetadataExtractor.h"
 
 #endif /* HiFidelity_Bridging_Header_h */
-
