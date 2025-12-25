@@ -139,6 +139,15 @@ Contributions are welcome! Feel free to:
 
 ---
 
+## 🙏 Acknowledgments
+
+- **[HiFidelity](https://github.com/rvarunrathod/HiFidelity)** – Design inspiration for the UI layout and audio architecture
+- **[BASS Audio Library](https://www.un4seen.com/)** – Professional audio engine
+- **[GRDB](https://github.com/groue/GRDB.swift)** – Fast, reliable local database
+- **[LRCLib](https://lrclib.net/)** – Time-synced lyrics API
+
+---
+
 ## 📝 License
 
 This project is open-source and available under the [MIT License](LICENSE).
