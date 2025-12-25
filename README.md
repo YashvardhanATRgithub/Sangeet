@@ -38,7 +38,7 @@ A stunning, native macOS music player built with SwiftUI, designed for audiophil
 
 ### ⚙️ Settings & Customization
 - **Appearance Settings** – Theme colors and visual preferences
-- **Audio Settings** – Crossfade, replay gain, and more
+- **Audio Settings** – Replay gain, EQ, and karaoke preferences
 - **Library Settings** – Manage music folders and scanning
 - **About Section** – Library statistics and quick links
 
@@ -70,11 +70,18 @@ A stunning, native macOS music player built with SwiftUI, designed for audiophil
 
 ### ⚠️ "App cannot be opened" Error?
 
-Since this app is not signed with a $99 Apple Developer account, macOS may block it. To open:
+Since this app is not signed with an Apple Developer account, macOS Gatekeeper may block it. Here's how to open it:
 
-1. **Right-click** (or Control-click) the Sangeet app icon.
-2. Select **Open** from the menu.
-3. Click **Open** in the dialog box.
+**Method 1: System Settings (Recommended)**
+1. Try to open Sangeet normally (it will be blocked)
+2. Go to **System Settings → Privacy & Security**
+3. Scroll down to find the message about Sangeet being blocked
+4. Click **"Open Anyway"**
+
+**Method 2: Right-Click**
+1. **Right-click** (or Control-click) the Sangeet app icon
+2. Select **Open** from the menu
+3. Click **Open** in the dialog box
 
 *(You only need to do this once)*
 
