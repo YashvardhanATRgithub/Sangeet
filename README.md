@@ -18,7 +18,7 @@ A stunning, native macOS music player built with SwiftUI, designed for audiophil
 - **Custom EQ Presets** – Save your own equalizer configurations
 - **🎤 One-Click Karaoke Mode** – Instantly reduce vocals for sing-along sessions
 - **Replay Gain Support** – Consistent volume across tracks
-- **Smart Crossfade** – Seamless transitions between tracks like a radio station
+- **Smart Crossfade** *(Coming Soon)* – Seamless transitions between tracks
 - **Soft Play/Pause** – Gentle fade-in/fade-out, no harsh cuts
 - **Gapless Playback** – Perfect for live albums and continuous mixes
 
@@ -85,10 +85,11 @@ Since this app is not signed with a $99 Apple Developer account, macOS may block
 | Technology | Purpose |
 |------------|---------|
 | **Swift & SwiftUI** | Modern, native macOS UI |
-| **AVFoundation** | Custom dual-node audio engine |
+| **BASS Audio Library** | Professional audio engine with DSP effects |
+| **BASS_FX** | 10-band parametric EQ and audio processing |
 | **MediaPlayer** | System-level Now Playing integration |
-| **CoreData** | Metadata and playlist persistence |
-| **URLSession** | GitHub API for update checking |
+| **GRDB/SQLite** | Fast metadata and playlist persistence |
+| **LRCLib API** | Time-synced lyrics fetching |
 
 ---
 

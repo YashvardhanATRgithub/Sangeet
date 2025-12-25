@@ -21,13 +21,58 @@ class GuidedTourManager: ObservableObject {
         // Tour will be started from MainView.onAppear
     }
     
+    /// Marker file to track when tour was completed
+    private var tourMarkerURL: URL {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let sangeetDir = appSupport.appendingPathComponent("Sangeet", isDirectory: true)
+        return sangeetDir.appendingPathComponent(".tour_completed")
+    }
+    
+    /// Get the app bundle's creation/modification date
+    private var appInstallDate: Date? {
+        guard let bundlePath = Bundle.main.bundlePath as String? else { return nil }
+        let attrs = try? FileManager.default.attributesOfItem(atPath: bundlePath)
+        // Use creation date, fallback to modification date
+        return (attrs?[.creationDate] as? Date) ?? (attrs?[.modificationDate] as? Date)
+    }
+    
+    /// Get the marker file's creation date
+    private var markerDate: Date? {
+        let attrs = try? FileManager.default.attributesOfItem(atPath: tourMarkerURL.path)
+        return attrs?[.creationDate] as? Date
+    }
+    
+    /// Check if tour should be shown
+    /// Returns true if: marker doesn't exist OR app is newer than marker (reinstall)
+    private var shouldShowTour: Bool {
+        // If marker doesn't exist, show tour
+        guard FileManager.default.fileExists(atPath: tourMarkerURL.path) else {
+            return true
+        }
+        
+        // If app install date is newer than marker date, this is a reinstall - show tour
+        if let appDate = appInstallDate, let marker = markerDate {
+            return appDate > marker
+        }
+        
+        return false
+    }
+    
+    private func markTourCompleted() {
+        let dir = tourMarkerURL.deletingLastPathComponent()
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        // Delete old marker and create new one with current timestamp
+        try? FileManager.default.removeItem(at: tourMarkerURL)
+        FileManager.default.createFile(atPath: tourMarkerURL.path, contents: nil)
+    }
+    
     /// Called from MainView.onAppear to check and start tour if needed
     func checkAndStartTourIfNeeded() {
         guard !hasCheckedTour else { return }
         hasCheckedTour = true
         
-        if !UserDefaults.standard.bool(forKey: "hasCompletedGuidedTour") {
-            // Small delay to ensure UI is fully loaded
+        // Show tour if this is a fresh install or reinstall
+        if shouldShowTour {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
                 self.startTour()
             }
@@ -133,7 +178,7 @@ class GuidedTourManager: ObservableObject {
         withAnimation(.easeOut(duration: 0.3)) {
             isActive = false
         }
-        UserDefaults.standard.set(true, forKey: "hasCompletedGuidedTour")
+        markTourCompleted()
     }
     
     /// Called when a tour target is clicked - advances if it matches current step

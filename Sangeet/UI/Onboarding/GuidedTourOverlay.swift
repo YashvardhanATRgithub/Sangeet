@@ -12,17 +12,28 @@ struct GuidedTourOverlay: View {
     @ObservedObject var theme = AppTheme.shared
     let elementFrames: [String: CGRect]
     
-    private var targetFrame: CGRect {
-        guard let targetID = tour.currentStep.targetElementID,
-              let frame = elementFrames[targetID] else {
-            return .zero
-        }
-        return frame
+    /// Convert global frame to local overlay coordinates
+    private func localFrame(for globalFrame: CGRect, in geometry: GeometryProxy) -> CGRect {
+        let overlayGlobalOrigin = geometry.frame(in: .global).origin
+        return CGRect(
+            x: globalFrame.minX - overlayGlobalOrigin.x,
+            y: globalFrame.minY - overlayGlobalOrigin.y,
+            width: globalFrame.width,
+            height: globalFrame.height
+        )
     }
     
     var body: some View {
         if tour.isActive {
             GeometryReader { geometry in
+                let targetFrame: CGRect = {
+                    guard let targetID = tour.currentStep.targetElementID,
+                          let globalFrame = elementFrames[targetID] else {
+                        return .zero
+                    }
+                    return localFrame(for: globalFrame, in: geometry)
+                }()
+                
                 ZStack {
                     // Dimmed background with spotlight cutout
                     SpotlightMask(targetFrame: targetFrame, cornerRadius: 12)
@@ -59,7 +70,7 @@ struct GuidedTourOverlay: View {
                     }
                     
                     // Tooltip card
-                    tooltipCard(in: geometry)
+                    tooltipCard(targetFrame: targetFrame, in: geometry)
                 }
             }
             .transition(.opacity)
@@ -67,8 +78,8 @@ struct GuidedTourOverlay: View {
         }
     }
     
-    private func tooltipCard(in geometry: GeometryProxy) -> some View {
-        let position = calculateTooltipPosition(in: geometry)
+    private func tooltipCard(targetFrame: CGRect, in geometry: GeometryProxy) -> some View {
+        let position = calculateTooltipPosition(targetFrame: targetFrame, in: geometry)
         
         return VStack(alignment: .leading, spacing: 12) {
             // Title
@@ -125,7 +136,7 @@ struct GuidedTourOverlay: View {
         .position(position)
     }
     
-    private func calculateTooltipPosition(in geometry: GeometryProxy) -> CGPoint {
+    private func calculateTooltipPosition(targetFrame: CGRect, in geometry: GeometryProxy) -> CGPoint {
         let screenCenter = CGPoint(x: geometry.size.width / 2, y: geometry.size.height / 2)
         
         // Center for welcome/complete steps
