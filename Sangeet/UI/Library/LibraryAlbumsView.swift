@@ -9,33 +9,55 @@ struct LibraryAlbumsView: View {
     ]
     
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading) {
-                Text("Albums")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                    .padding(.bottom)
-                
-                LazyVGrid(columns: columns, spacing: 30) {
-                    ForEach(albums) { album in
-                        NavigationLink(value: album) {
-                            AlbumGridItem(album: album)
+        VStack(alignment: .leading, spacing: 0) {
+            // Title always visible
+            Text("Albums")
+                .font(.largeTitle.bold())
+                .padding(.horizontal, 24)
+                .padding(.top, 24)
+            
+            if albums.isEmpty {
+                // Empty state - centered like Favorites
+                EmptyStateView(
+                    icon: "square.stack",
+                    title: "No Albums",
+                    message: "Import music folders to see your albums here."
+                )
+            } else {
+                ScrollView {
+                    LazyVGrid(columns: columns, spacing: 30) {
+                        ForEach(albums) { album in
+                            NavigationLink(value: album) {
+                                AlbumGridItem(album: album)
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
+                    .padding(24)
                 }
             }
-            .padding()
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .task {
-            do {
-                self.albums = try await services.database.fetchAlbums()
-            } catch {
-                print("Failed to load albums: \(error)")
-            }
+            await loadAlbums()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .libraryDataDidChange)) { _ in
+            Task { await loadAlbums() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .foldersDataDidChange)) { _ in
+            Task { await loadAlbums() }
         }
         .nowPlayingBarPadding()
         .background(Theme.background)
+    }
+    
+    @MainActor
+    private func loadAlbums() async {
+        do {
+            self.albums = try await services.database.fetchAlbums()
+        } catch {
+            print("Failed to load albums: \(error)")
+        }
     }
 }
 

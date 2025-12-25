@@ -56,20 +56,21 @@ struct FullScreenPlayerView: View {
                 // Main Content Area
                 if showLyrics, let track = playback.currentTrack {
                     // Split View: Artwork (Left) | Lyrics (Right)
-                    HStack(alignment: .top, spacing: 40) {
+                    HStack(alignment: .center, spacing: 40) {
                         // Left: Artwork + Info
                         VStack(spacing: 20) {
+                            Spacer()
                             TrackArtworkView(
                                 track: track,
-                                maxSize: 320,
+                                maxSize: 280,
                                 cornerRadius: 20,
-                                iconSize: 80
+                                iconSize: 70
                             )
                             .shadow(color: .black.opacity(0.4), radius: 20, x: 0, y: 10)
                             
                             VStack(spacing: 6) {
                                 Text(track.title)
-                                    .font(.system(size: 22, weight: .bold))
+                                    .font(.system(size: 20, weight: .bold))
                                     .lineLimit(2)
                                     .multilineTextAlignment(.center)
                                 
@@ -78,9 +79,10 @@ struct FullScreenPlayerView: View {
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
                             }
-                            .frame(width: 320)
+                            .frame(width: 280)
+                            Spacer()
                         }
-                        .frame(width: 360)
+                        .frame(width: 320)
                         
                         // Right: Lyrics
                         LyricsView(track: track, currentTime: playback.currentTime)
@@ -92,7 +94,7 @@ struct FullScreenPlayerView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 24))
                     }
                     .padding(.horizontal, 40)
-                    .frame(maxHeight: .infinity)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                 } else {
                     // Standard View: Centered Artwork + Info
                     VStack(spacing: 24) {
@@ -154,10 +156,10 @@ struct FullScreenPlayerView: View {
                     .padding(.horizontal, 40)
                     
                     // Main Playback Controls
-                    HStack(spacing: 60) {
+                    HStack(spacing: 50) {
                         Button(action: { playback.previous() }) {
                             Image(systemName: "backward.fill")
-                                .font(.system(size: 32, weight: .semibold))
+                                .font(.system(size: 26, weight: .semibold))
                                 .foregroundStyle(theme.currentTheme.primaryColor.opacity(0.9))
                         }
                         .buttonStyle(.plain)
@@ -167,15 +169,15 @@ struct FullScreenPlayerView: View {
                             ZStack {
                                 Circle()
                                     .fill(theme.currentTheme.primaryColor)
-                                    .frame(width: 80, height: 80)
-                                    .shadow(color: theme.currentTheme.primaryColor.opacity(0.4), radius: 20, x: 0, y: 0)
-                                    .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
+                                    .frame(width: 68, height: 68)
+                                    .shadow(color: theme.currentTheme.primaryColor.opacity(0.4), radius: 16, x: 0, y: 0)
+                                    .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
                                 
                                 Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
-                                    .font(.system(size: 32, weight: .black))
+                                    .font(.system(size: 26, weight: .black))
                                     .foregroundStyle(.white)
                                     // Slight offset for visual center of 'play' triangle
-                                    .offset(x: playback.isPlaying ? 0 : 3)
+                                    .offset(x: playback.isPlaying ? 0 : 2)
                             }
                         }
                         .buttonStyle(.plain)
@@ -185,13 +187,13 @@ struct FullScreenPlayerView: View {
                         
                         Button(action: { playback.next() }) {
                             Image(systemName: "forward.fill")
-                                .font(.system(size: 32, weight: .semibold))
+                                .font(.system(size: 26, weight: .semibold))
                                 .foregroundStyle(theme.currentTheme.primaryColor.opacity(0.9))
                         }
                         .buttonStyle(.plain)
                         .hoverEffect(scale: 1.1)
                     }
-                    .padding(.top, 10)
+                    .padding(.top, 16)
                     
                     // Volume Slider (Sleek)
                     HStack(spacing: 16) {

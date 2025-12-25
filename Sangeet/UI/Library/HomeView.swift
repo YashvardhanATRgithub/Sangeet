@@ -7,67 +7,88 @@ struct HomeView: View {
     @State private var favoriteTracks: [Track] = []
     
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
-                // Hero removed
-                
-                // Recently Added
-                if !recentTracks.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Recently Added")
-                            .font(.title2.weight(.semibold))
-                        
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 18) {
-                                ForEach(recentTracks) { track in
-                                    SongGridItem(track: track)
-                                        .frame(width: 170)
-                                        .onTapGesture {
-                                            playAndQueue(track: track, from: recentTracks)
+        VStack(alignment: .leading, spacing: 0) {
+            // Title always visible
+            Text("Home")
+                .font(.largeTitle.bold())
+                .padding(.horizontal, 24)
+                .padding(.top, 24)
+            
+            if recentTracks.isEmpty && favoriteTracks.isEmpty {
+                // Empty state - centered like Favorites
+                EmptyStateView(
+                    icon: "music.note",
+                    title: "No Music",
+                    message: "Import music folders to get started."
+                )
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 28) {
+                        // Recently Added
+                        if !recentTracks.isEmpty {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Recently Added")
+                                    .font(.title2.weight(.semibold))
+                                
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 18) {
+                                        ForEach(recentTracks) { track in
+                                            SongGridItem(track: track)
+                                                .frame(width: 170)
+                                                .onTapGesture {
+                                                    playAndQueue(track: track, from: recentTracks)
+                                                }
                                         }
+                                    }
+                                    .padding(.horizontal, 4)
+                                    .padding(.bottom, 12)
                                 }
                             }
-                            .padding(.horizontal, 4)
-                            .padding(.bottom, 12)
                         }
-                    }
-                }
-                
-                // Favorites
-                 if !favoriteTracks.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Favorites")
-                            .font(.title2.weight(.semibold))
                         
-                         ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 18) {
-                                ForEach(favoriteTracks) { track in
-                                    SongGridItem(track: track)
-                                        .frame(width: 170)
-                                        .onTapGesture {
-                                            playAndQueue(track: track, from: favoriteTracks)
+                        // Favorites
+                        if !favoriteTracks.isEmpty {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Favorites")
+                                    .font(.title2.weight(.semibold))
+                                
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 18) {
+                                        ForEach(favoriteTracks) { track in
+                                            SongGridItem(track: track)
+                                                .frame(width: 170)
+                                                .onTapGesture {
+                                                    playAndQueue(track: track, from: favoriteTracks)
+                                                }
                                         }
+                                    }
+                                    .padding(.horizontal, 4)
+                                    .padding(.bottom, 12)
                                 }
                             }
-                            .padding(.horizontal, 4)
-                            .padding(.bottom, 12)
                         }
                     }
-                }
-                
-                if recentTracks.isEmpty && favoriteTracks.isEmpty {
-                    ContentUnavailableView("No Music", systemImage: "music.note", description: Text("Import music to get started."))
-                        .glassCard()
+                    .padding(24)
                 }
             }
-            .padding(30)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .nowPlayingBarPadding()
         .background(Theme.background)
         .task {
             await loadHomeData()
         }
         .onReceive(NotificationCenter.default.publisher(for: .libraryDidUpdate)) { _ in
+            Task {
+                await loadHomeData()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .libraryDataDidChange)) { _ in
+            Task {
+                await loadHomeData()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .foldersDataDidChange)) { _ in
             Task {
                 await loadHomeData()
             }

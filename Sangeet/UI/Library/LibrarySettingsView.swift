@@ -93,6 +93,12 @@ struct LibrarySettingsView: View {
         .onAppear {
             refresh()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .foldersDataDidChange)) { _ in
+            refresh()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .libraryDataDidChange)) { _ in
+            refresh()
+        }
     }
     
     func refresh() {

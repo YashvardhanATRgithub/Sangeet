@@ -42,16 +42,10 @@ struct MainView: View {
             
             Spacer()
             
-            // Search Bar (Center) - Ported from HiFidelity
+            // Search Bar (Center)
             SearchBar(
                 text: $services.searchQuery,
-                isActive: Binding(
-                    get: { selection == .search },
-                    set: { active in
-                        if active { selection = .search }
-                        else if selection == .search { selection = .home } // Go home if search deactivated
-                    }
-                )
+                isFocused: $isSearchFocused
             )
             
             Spacer()
@@ -77,6 +71,7 @@ struct MainView: View {
                         .foregroundStyle(.secondary)
                  }
                  .buttonStyle(.plain)
+                 .tourTarget(id: "tour-settings-button")
             }
             .layoutPriority(1)
             .padding(.trailing, 68) // Match Left Padding (Symmetry)
@@ -93,6 +88,7 @@ struct MainView: View {
     @State private var columnVisibility = NavigationSplitViewVisibility.all
     @State private var showQueue = false
     // @FocusState private var isSearchFocused: Bool // Removed, handled by SearchBar component
+    @FocusState private var isSearchFocused: Bool
     @State private var showCommandPalette = false
     @State private var showFullScreenPlayer = false
     @State private var nowPlayingBarHeight: CGFloat = NowPlayingBarDefaults.minHeight
@@ -102,6 +98,7 @@ struct MainView: View {
     @State private var showingEqualizer = false
     @State private var showLyricsInFullScreen = false
     @State private var navigationPath = NavigationPath()
+    @State private var tourElementFrames: [String: CGRect] = [:]
     
     var body: some View {
         ZStack(alignment: .top) {
@@ -167,6 +164,15 @@ struct MainView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading) // Prevent centering
             }
             .background(Theme.background)
+            .simultaneousGesture(
+                TapGesture()
+                    .onEnded { _ in
+                        // Only clear focus if clicking outside search bar (not on interactive elements)
+                        if isSearchFocused && selection != .search {
+                            isSearchFocused = false
+                        }
+                    }
+            )
             
             // Layer 3: Player Bar (Always Mounted to preserve state)
             NowPlayingBar(
@@ -186,6 +192,14 @@ struct MainView: View {
             .animation(.spring(response: 0.35, dampingFraction: 0.8), value: showFullScreenPlayer)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             .zIndex(9)
+            
+            // Layer 2.4: Import Progress Banner (above NowPlayingBar)
+            VStack {
+                Spacer()
+                ImportProgressBanner()
+            }
+            .padding(.bottom, nowPlayingBarHeight + 10)
+            .zIndex(10)
             
             // Layer 2.5: Queue Drawer
             if showQueue {
@@ -264,6 +278,31 @@ struct MainView: View {
         .environment(\.nowPlayingBarHeight, nowPlayingBarHeight)
         .onAppear {
             applyBaseWindowStyleIfNeeded()
+            // Start guided tour for first-time users
+            GuidedTourManager.shared.checkAndStartTourIfNeeded()
+        }
+        // Open search view when search bar gains focus
+        .onChange(of: isSearchFocused) { _, focused in
+            if focused {
+                selection = .search
+            }
+        }
+        // Switch to search view when typing starts
+        .onChange(of: services.searchQuery) { _, newValue in
+            if !newValue.isEmpty && selection != .search {
+                selection = .search
+            } else if newValue.isEmpty && selection == .search && !isSearchFocused {
+                // Only go home if focus is also gone
+                selection = .home
+            }
+        }
+        .overlay {
+            // Guided tour for first-time users
+            GuidedTourOverlay(elementFrames: tourElementFrames)
+                .zIndex(200)
+        }
+        .onPreferenceChange(TourHighlightPreferenceKey.self) { frames in
+            tourElementFrames = frames
         }
         .overlay {
             // Keep FullScreenPlayerView always mounted to preserve state/subscriptions

@@ -244,6 +244,7 @@ struct NowPlayingBar: View {
                     }
                     .buttonStyle(.plain)
                     .hoverEffect()
+                    .tourTarget(id: "tour-equalizer-button")
                     
                     // Karaoke
                     Button(action: { 
@@ -260,6 +261,7 @@ struct NowPlayingBar: View {
                     }
                     .buttonStyle(.plain)
                     .hoverEffect()
+                    .tourTarget(id: "tour-karaoke-button")
                     
                     // Lyrics
                     Button(action: { onOpenLyrics?() }) {
@@ -271,6 +273,7 @@ struct NowPlayingBar: View {
                     }
                     .buttonStyle(.plain)
                     .hoverEffect()
+                    .tourTarget(id: "tour-lyrics-button")
 
                     // Expand
                     Button(action: { showFullScreen = true }) {
@@ -282,6 +285,7 @@ struct NowPlayingBar: View {
                     }
                     .buttonStyle(.plain)
                     .hoverEffect()
+                    .tourTarget(id: "tour-fullscreen-button")
                 }
                 .frame(width: 480, alignment: .trailing)
             }
