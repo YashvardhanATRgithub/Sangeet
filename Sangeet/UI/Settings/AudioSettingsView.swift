@@ -30,6 +30,11 @@ struct AudioSettingsView: View {
             
             Divider()
             
+            // Karaoke Settings
+            KaraokeSettingsView()
+            
+            Divider()
+            
             // ReplayGain
             settingsSection(title: "ReplayGain", icon: "waveform.path.ecg") {
                 replayGainSettingsView

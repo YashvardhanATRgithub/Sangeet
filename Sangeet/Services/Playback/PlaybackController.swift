@@ -258,6 +258,34 @@ class PlaybackController: ObservableObject {
         }
     }
     
+    /// Switches the underlying audio file without changing the metadata/Track info.
+    /// Used for seamless switching between Original, Karaoke, and Vocal versions.
+    func switchAudioSource(to url: URL) {
+        let isCurrentlyPlaying = isPlaying
+        let position = currentTime
+        
+        Logger.info("Swapping audio source to: \(url.lastPathComponent)")
+        
+        // Load the new file
+        if audioEngine.load(url: url) {
+            // Restore position
+            if position > 0 {
+                _ = audioEngine.seek(to: position)
+                currentTime = position
+            }
+            
+            // Resume if needed
+            if isCurrentlyPlaying {
+                _ = audioEngine.play()
+                startPositionTimer()
+            }
+            
+            Logger.info("✓ Swapped audio source successfully")
+        } else {
+            Logger.error("Failed to swap audio source")
+        }
+    }
+
     @objc private func handleDeviceRemoved(_ notification: Notification) {
         Logger.warning("⚠️ Audio device was removed - pausing playback")
         

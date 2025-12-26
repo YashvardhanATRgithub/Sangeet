@@ -105,6 +105,10 @@ struct AlbumDetailView: View {
                                     } label: {
                                         Label("Add to Queue", systemImage: "text.append")
                                     }
+                                    
+                                    Divider()
+                                    
+                                    KaraokeContextMenu(track: track)
                                 }
                         }
                     }

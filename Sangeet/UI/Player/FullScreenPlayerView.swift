@@ -255,18 +255,25 @@ struct FullScreenPlayerView: View {
                         .buttonStyle(.plain)
                         .hoverEffect()
 
-                        Button(action: { 
-                            effects.isKaraokeEnabled.toggle() 
-                            if effects.isKaraokeEnabled {
-                                withAnimation(.spring()) { showLyrics = true }
-                            }
-                        }) {
-                            Image(systemName: effects.isKaraokeEnabled ? "music.mic" : "music.mic")
+                        // Karaoke (Instrumental)
+                        Button(action: { toggleKaraokeMode() }) {
+                            Image(systemName: effects.displayMode == .instrumental ? "music.mic" : "music.mic")
                                 .font(.title3)
-                                .foregroundStyle(effects.isKaraokeEnabled ? Theme.accent : .white.opacity(0.6))
+                                .foregroundStyle(effects.displayMode == .instrumental ? Theme.accent : .white.opacity(0.6))
                         }
                         .buttonStyle(.plain)
                         .hoverEffect()
+                        .help("Karaoke Mode (Instrumental)")
+
+                        // Vocals Only
+                        Button(action: { toggleVocalMode() }) {
+                            Image(systemName: effects.displayMode == .vocals ? "mic.fill" : "mic")
+                                .font(.title3)
+                                .foregroundStyle(effects.displayMode == .vocals ? Theme.accent : .white.opacity(0.6))
+                        }
+                        .buttonStyle(.plain)
+                        .hoverEffect()
+                        .help("Vocals Only Mode")
 
                         Button(action: { showQueue.toggle() }) {
                             Image(systemName: "list.bullet")
@@ -307,5 +314,63 @@ struct FullScreenPlayerView: View {
         let minutes = Int(duration) / 60
         let seconds = Int(duration) % 60
         return String(format: "%d:%02d", minutes, seconds)
+    }
+    
+    // MARK: - Karaoke Logic
+    
+    private func toggleKaraokeMode() {
+        guard let track = playback.currentTrack else { return }
+        
+        if effects.displayMode == .instrumental {
+            playback.switchAudioSource(to: track.url)
+            effects.displayMode = .original
+        } else {
+            if let path = KaraokeEngine.shared.getInstrumentalPath(for: track) {
+                playback.switchAudioSource(to: path)
+                effects.displayMode = .instrumental
+                withAnimation(.spring()) { showLyrics = true }
+            } else {
+                Task {
+                    do {
+                        let path = try await KaraokeEngine.shared.createInstrumental(for: track)
+                        await MainActor.run {
+                            playback.switchAudioSource(to: path)
+                            effects.displayMode = .instrumental
+                            withAnimation(.spring()) { showLyrics = true }
+                        }
+                    } catch {
+                        Logger.error("Failed to create karaoke: \(error)")
+                    }
+                }
+            }
+        }
+    }
+    
+    private func toggleVocalMode() {
+        guard let track = playback.currentTrack else { return }
+        
+        if effects.displayMode == .vocals {
+            playback.switchAudioSource(to: track.url)
+            effects.displayMode = .original
+        } else {
+            if let path = KaraokeEngine.shared.getVocalsPath(for: track) {
+                playback.switchAudioSource(to: path)
+                effects.displayMode = .vocals
+            } else {
+                Task {
+                    do {
+                        _ = try await KaraokeEngine.shared.createInstrumental(for: track)
+                        if let vocalPath = KaraokeEngine.shared.getVocalsPath(for: track) {
+                            await MainActor.run {
+                                playback.switchAudioSource(to: vocalPath)
+                                effects.displayMode = .vocals
+                            }
+                        }
+                    } catch {
+                        Logger.error("Failed to create vocals: \(error)")
+                    }
+                }
+            }
+        }
     }
 }

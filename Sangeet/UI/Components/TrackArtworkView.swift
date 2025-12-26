@@ -132,6 +132,22 @@ struct SongGridItem: View {
                 Label(track.isFavorite ? "Unfavorite" : "Favorite", systemImage: track.isFavorite ? "heart.slash" : "heart")
             }
             
+            Divider()
+            
+            Divider()
+            
+            KaraokeContextMenu(track: track)
+            
+            Divider()
+            
+            Button {
+                NSWorkspace.shared.activateFileViewerSelecting([track.url])
+            } label: {
+                Label("Show in Finder", systemImage: "folder")
+            }
+            
+            Divider()
+            
             if let playlistContext = playlistContext {
                 Button(role: .destructive) {
                     if let id = track.trackId {

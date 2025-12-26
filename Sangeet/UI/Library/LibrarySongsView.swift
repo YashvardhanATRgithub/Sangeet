@@ -147,6 +147,10 @@ struct LibrarySongsView: View {
                                     
                                     Divider()
                                     
+                                    KaraokeContextMenu(track: track)
+                                    
+                                    Divider()
+                                    
                                     Button {
                                         NSWorkspace.shared.activateFileViewerSelecting([track.url])
                                     } label: {

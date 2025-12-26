@@ -246,22 +246,34 @@ struct NowPlayingBar: View {
                     .hoverEffect()
                     .tourTarget(id: "tour-equalizer-button")
                     
-                    // Karaoke
-                    Button(action: { 
-                        effects.isKaraokeEnabled.toggle()
-                        if effects.isKaraokeEnabled {
-                            onOpenLyrics?() // Opens Full Screen with Lyrics
-                        }
+                    // 4. Karaoke (Instrumental)
+                    Button(action: {
+                        toggleKaraokeMode()
                     }) {
-                        Image(systemName: effects.isKaraokeEnabled ? "music.mic" : "music.mic")
+                        Image(systemName: effects.displayMode == .instrumental ? "music.mic" : "music.mic")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(effects.isKaraokeEnabled ? theme.currentTheme.primaryColor : .secondary)
+                            .foregroundStyle(effects.displayMode == .instrumental ? theme.currentTheme.primaryColor : .secondary)
                             .frame(width: 32, height: 44)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .hoverEffect()
                     .tourTarget(id: "tour-karaoke-button")
+                    .help("Toggle Karaoke Mode")
+
+                    // 5. Vocals Only
+                    Button(action: {
+                        toggleVocalMode()
+                    }) {
+                        Image(systemName: effects.displayMode == .vocals ? "mic.fill" : "mic")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(effects.displayMode == .vocals ? theme.currentTheme.primaryColor : .secondary)
+                            .frame(width: 32, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .hoverEffect()
+                    .help("Play Vocals Only")
                     
                     // Lyrics
                     Button(action: { onOpenLyrics?() }) {
@@ -307,5 +319,74 @@ struct NowPlayingBar: View {
         let minutes = Int(time) / 60
         let seconds = Int(time) % 60
         return String(format: "%d:%02d", minutes, seconds)
+    }
+    
+    // MARK: - Karaoke Logic
+    
+    private func toggleKaraokeMode() {
+        guard let track = playback.currentTrack else { return }
+        
+        // Toggle Logic: If ON -> Turn OFF. If OFF or Vocals -> Turn ON.
+        if effects.displayMode == .instrumental {
+            // Revert to Original
+            playback.switchAudioSource(to: track.url)
+            effects.displayMode = .original
+        } else {
+            // Check existence
+            if let path = KaraokeEngine.shared.getInstrumentalPath(for: track) {
+                // Play Instrumental
+                playback.switchAudioSource(to: path)
+                effects.displayMode = .instrumental
+                onOpenLyrics?()
+            } else {
+                // Not found -> Create it
+                Task {
+                    do {
+                        let path = try await KaraokeEngine.shared.createInstrumental(for: track)
+                        await MainActor.run {
+                            playback.switchAudioSource(to: path)
+                            effects.displayMode = .instrumental
+                            onOpenLyrics?()
+                        }
+                    } catch {
+                        Logger.error("Failed to create karaoke: \(error)")
+                    }
+                }
+            }
+        }
+    }
+    
+    private func toggleVocalMode() {
+        guard let track = playback.currentTrack else { return }
+        
+        if effects.displayMode == .vocals {
+            // Revert
+            playback.switchAudioSource(to: track.url)
+            effects.displayMode = .original
+        } else {
+            // Check existence
+            if let path = KaraokeEngine.shared.getVocalsPath(for: track) {
+                playback.switchAudioSource(to: path)
+                effects.displayMode = .vocals
+            } else {
+                // Create
+                 Task {
+                    do {
+                        // This creates both files (instrumental + vocal)
+                        _ = try await KaraokeEngine.shared.createInstrumental(for: track) // Ignore return (it returns accom.)
+                        
+                        // We want vocals specifically
+                        if let vocalPath = KaraokeEngine.shared.getVocalsPath(for: track) {
+                            await MainActor.run {
+                                playback.switchAudioSource(to: vocalPath)
+                                effects.displayMode = .vocals
+                            }
+                        }
+                    } catch {
+                       Logger.error("Failed to create vocals: \(error)")
+                    }
+                }
+            }
+        }
     }
 }

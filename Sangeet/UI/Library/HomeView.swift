@@ -38,6 +38,18 @@ struct HomeView: View {
                                                 .onTapGesture {
                                                     playAndQueue(track: track, from: recentTracks)
                                                 }
+                                                .contextMenu {
+                                                    Button {
+                                                        playAndQueue(track: track, from: recentTracks)
+                                                    } label: {
+                                                        Label("Play", systemImage: "play")
+                                                    }
+                                                    
+                                                    Divider()
+                                                    
+                                                    // Karaoke
+                                                    KaraokeContextMenu(track: track)
+                                                }
                                         }
                                     }
                                     .padding(.horizontal, 4)
@@ -59,6 +71,18 @@ struct HomeView: View {
                                                 .frame(width: 170)
                                                 .onTapGesture {
                                                     playAndQueue(track: track, from: favoriteTracks)
+                                                }
+                                                .contextMenu {
+                                                    Button {
+                                                        playAndQueue(track: track, from: favoriteTracks)
+                                                    } label: {
+                                                        Label("Play", systemImage: "play")
+                                                    }
+                                                    
+                                                    Divider()
+                                                    
+                                                    // Karaoke
+                                                    KaraokeContextMenu(track: track)
                                                 }
                                         }
                                     }
