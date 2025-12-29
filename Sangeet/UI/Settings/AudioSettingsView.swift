@@ -2,7 +2,7 @@
 //  AudioSettingsView.swift
 //  Sangeet
 //
-// Ported from HiFidelity
+// Ported from Sangeet
 //
 
 import SwiftUI

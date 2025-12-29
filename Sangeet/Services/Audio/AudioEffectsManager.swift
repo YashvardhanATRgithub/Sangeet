@@ -1,6 +1,6 @@
 //
 //  AudioEffectsManager.swift
-//  HiFidelity
+//  Sangeet
 //
 //  Manages DSP effects and custom processing for audio playback
 //

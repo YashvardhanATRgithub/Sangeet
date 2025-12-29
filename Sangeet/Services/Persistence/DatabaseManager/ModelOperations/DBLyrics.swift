@@ -1,6 +1,6 @@
 //
 //  DBLyrics.swift
-//  HiFidelity
+//  Sangeet
 //
 //  Database operations for lyrics management
 //

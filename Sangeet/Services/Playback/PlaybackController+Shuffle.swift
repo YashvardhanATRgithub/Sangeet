@@ -1,6 +1,6 @@
 //
 //  PlaybackController+Shuffle.swift
-//  HiFidelity
+//  Sangeet
 //
 //  Shuffle and repeat mode logic
 //

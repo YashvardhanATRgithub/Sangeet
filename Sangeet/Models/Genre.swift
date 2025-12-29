@@ -1,6 +1,6 @@
 //
 //  Genre.swift
-//  HiFidelity
+//  Sangeet
 //
 //  Normalized genre entity
 //

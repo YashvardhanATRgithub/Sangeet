@@ -1,6 +1,6 @@
 //
 //  PlaybackController+RemoteCommands.swift
-//  HiFidelity
+//  Sangeet
 //
 //  Remote command center setup for media controls
 //

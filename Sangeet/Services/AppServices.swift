@@ -7,7 +7,7 @@ class AppServices: ObservableObject {
     static let shared = AppServices()
     let objectWillChange = ObservableObjectPublisher()
     
-    // Core Services (HiFidelity Backend)
+    // Core Services (Sangeet Backend)
     let database: DatabaseManager
     let playback: PlaybackController
     let search: SearchService
@@ -40,7 +40,7 @@ class AppServices: ObservableObject {
         let searchService = SearchService(database: self.database)
         self.search = searchService
         
-        Logger.info("AppServices initialized with HiFidelity backend")
+        Logger.info("AppServices initialized with Sangeet backend")
         
         // Restore access to music folders (Critical for Sandbox)
         Task {

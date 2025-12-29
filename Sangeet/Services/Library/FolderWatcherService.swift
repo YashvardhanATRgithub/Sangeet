@@ -1,6 +1,6 @@
 //
 //  FolderWatcherService.swift
-//  HiFidelity
+//  Sangeet
 //
 //  Monitors music folders for file system changes and automatically updates the library
 //

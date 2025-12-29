@@ -1,6 +1,6 @@
 //
 //  PlaybackController+Queue.swift
-//  HiFidelity
+//  Sangeet
 //
 //  Queue management methods
 //

@@ -1,6 +1,6 @@
 //
 //  StringNormalization.swift
-//  HiFidelity
+//  Sangeet
 //
 //  String normalization utilities for searching, deduplication, and sorting
 //  Based on industry standards (MusicBrainz, iTunes)

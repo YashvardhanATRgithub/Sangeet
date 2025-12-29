@@ -1,6 +1,6 @@
 //
 //  PathRecoveryManager.swift
-//  HiFidelity
+//  Sangeet
 //
 //  Handles recovery of moved/missing audio files through multiple strategies
 //

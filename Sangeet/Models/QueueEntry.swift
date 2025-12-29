@@ -1,6 +1,6 @@
 //
 //  QueueEntry.swift
-//  HiFidelity
+//  Sangeet
 //
 //  Persistent queue management
 //

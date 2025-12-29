@@ -1,5 +1,6 @@
 import SwiftUI
 
+// MARK: - Android-Style Squiggly Progress Bar (Lock Screen Snake)
 struct CustomProgressBar: View {
     @Binding var value: TimeInterval
     var total: TimeInterval
@@ -15,8 +16,17 @@ struct CustomProgressBar: View {
     @State private var baseValue: TimeInterval = 0
     @State private var isHovering: Bool = false
     
+    // Wave animation phase (only animates when playing)
+    @State private var wavePhase: CGFloat = 0
+    
+    // Wave parameters (tuned for Android lock screen look)
+    private let waveAmplitude: CGFloat = 3.0     // Height of the wave peaks
+    private let waveFrequency: CGFloat = 0.08   // How many waves per point
+    private let waveSpeed: CGFloat = 2.5         // Animation speed
+    private let trackHeight: CGFloat = 4.0       // Base track height
+    
     var body: some View {
-        TimelineView(.animation) { context in
+        TimelineView(.animation(minimumInterval: 1/60, paused: !isPlaying && !isDragging)) { context in
             // Calculate interpolated time
             let currentDisplayTime: TimeInterval = {
                 if isDragging { return dragProgress * total }
@@ -30,42 +40,72 @@ struct CustomProgressBar: View {
             
             let progress = total > 0 ? min(max(0, currentDisplayTime / total), 1.0) : 0
             
+            // Update wave phase continuously when playing
+            let animatedPhase: CGFloat = isPlaying ? CGFloat(context.date.timeIntervalSinceReferenceDate) * waveSpeed : wavePhase
+            
             GeometryReader { geometry in
                 let width = geometry.size.width
                 let height = geometry.size.height
                 let centerY = height / 2
-                let filledWidth = max(0, min(width, width * CGFloat(progress)))
+                let progressX = width * CGFloat(progress)
                 
-                ZStack(alignment: .leading) {
-                    // 1. Background Track
+                ZStack {
+                    // 1. Background Track (straight line)
                     Capsule()
                         .fill(Color.secondary.opacity(0.2))
-                        .frame(height: 4)
-                        .frame(maxWidth: .infinity)
+                        .frame(height: trackHeight)
+                        .position(x: width / 2, y: centerY)
                     
-                    // 2. Active Progress (Neon Beam)
-                    Capsule()
-                        .fill(
-                            LinearGradient(
-                                colors: [Theme.accent, Theme.accent.opacity(0.8)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
+                    // 2. Squiggly Progress Wave (the snake!)
+                    Canvas { ctx, size in
+                        guard progressX > 0 else { return }
+                        
+                        var path = Path()
+                        let startX: CGFloat = 0
+                        let endX = progressX
+                        
+                        // Start the path
+                        path.move(to: CGPoint(x: startX, y: centerY))
+                        
+                        // Draw the wavy line
+                        for x in stride(from: startX, through: endX, by: 1) {
+                            // Sine wave that travels along the bar
+                            let relativeX = x / width
+                            let wave = sin((x * waveFrequency) + animatedPhase) * waveAmplitude
+                            
+                            // Dampen the wave near the edges for smooth entry/exit
+                            let edgeDamping = min(x / 20, (endX - x) / 20, 1.0)
+                            let dampedWave = wave * edgeDamping
+                            
+                            path.addLine(to: CGPoint(x: x, y: centerY + dampedWave))
+                        }
+                        
+                        // Draw the wave stroke (no glow - clean look)
+                        ctx.stroke(
+                            path,
+                            with: .linearGradient(
+                                Gradient(colors: [Theme.accent, Theme.accent.opacity(0.9)]),
+                                startPoint: .zero,
+                                endPoint: CGPoint(x: endX, y: 0)
+                            ),
+                            style: StrokeStyle(lineWidth: trackHeight, lineCap: .round, lineJoin: .round)
                         )
-                        .frame(width: filledWidth, height: 4)
-                        .shadow(color: Theme.accent.opacity(0.6), radius: 6, x: 0, y: 0)
+                    }
                     
-                // Thumb (Standard Circle)
-                Circle()
-                    .fill(.white)
-                    .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
-                    .frame(width: 14, height: 14) // Visual size
-                    .background(Circle().fill(.white.opacity(0.001)).frame(width: 30, height: 30)) // Hit area
-                    .scaleEffect(isDragging ? 1.3 : (isHovering ? 1.2 : 1.0))
-                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isDragging)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isHovering)
-                    .onHover { isHovering = $0 }
-                    .position(x: geometry.size.width * CGFloat(currentDisplayTime / total), y: geometry.size.height / 2)
+                    // 3. Android-style Pill Thumb (vertical capsule - stays fixed at center, doesn't move with wave)
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(.white)
+                        .shadow(color: .black.opacity(0.25), radius: 3, x: 0, y: 1)
+                        .frame(width: 8, height: 18)
+                        .background(RoundedRectangle(cornerRadius: 4).fill(.white.opacity(0.001)).frame(width: 30, height: 30)) // Hit area
+                        .scaleEffect(isDragging ? 1.2 : (isHovering ? 1.1 : 1.0))
+                        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isDragging)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isHovering)
+                        .onHover { isHovering = $0 }
+                        .position(
+                            x: max(4, min(width - 4, progressX)),
+                            y: centerY  // Fixed at center - doesn't move with wave
+                        )
                 }
                 .contentShape(Rectangle())
                 .gesture(
@@ -79,17 +119,17 @@ struct CustomProgressBar: View {
                             dragProgress = p
                         }
                         .onEnded { value in
-                        let p = min(max(0, value.location.x / width), 1)
-                        isDragging = false
-                        onEditingChanged(false)
-                        
-                        let targetTime = p * total
-                        // Optimistic update to prevent visual glitch/jump back
-                        baseValue = targetTime
-                        lastUpdatedTime = Date()
-                        
-                        onSeek(targetTime)
-                    }
+                            let p = min(max(0, value.location.x / width), 1)
+                            isDragging = false
+                            onEditingChanged(false)
+                            
+                            let targetTime = p * total
+                            // Optimistic update to prevent visual glitch/jump back
+                            baseValue = targetTime
+                            lastUpdatedTime = Date()
+                            
+                            onSeek(targetTime)
+                        }
                 )
             }
         }

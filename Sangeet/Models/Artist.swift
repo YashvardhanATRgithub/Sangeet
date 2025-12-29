@@ -1,6 +1,6 @@
 //
 //  Artist.swift
-//  HiFidelity
+//  Sangeet
 //
 //  Normalized artist entity
 //

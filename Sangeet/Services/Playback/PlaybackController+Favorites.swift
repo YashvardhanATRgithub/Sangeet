@@ -1,6 +1,6 @@
 //
 //  PlaybackController+Favorites.swift
-//  HiFidelity
+//  Sangeet
 //
 //  Favorite track management
 //

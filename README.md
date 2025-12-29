@@ -2,7 +2,6 @@
 
 A stunning, native macOS music player built with SwiftUI, designed for audiophiles who value aesthetics and performance.
 
-![Sangeet Demo](docs/demo.gif)
 
 ## ✨ Features
 
@@ -16,7 +15,6 @@ A stunning, native macOS music player built with SwiftUI, designed for audiophil
 - **10-Band Graphic Equalizer** – Fine-tune your audio with precision
 - **15+ Built-in EQ Presets** – Rock, Jazz, Classical, Electronic, and more
 - **Custom EQ Presets** – Save your own equalizer configurations
-- **🎤 One-Click Karaoke Mode** – Instantly reduce vocals for sing-along sessions
 - **Replay Gain Support** – Consistent volume across tracks
 - **Smart Crossfade** *(Coming Soon)* – Seamless transitions between tracks
 - **Soft Play/Pause** – Gentle fade-in/fade-out, no harsh cuts
@@ -38,29 +36,12 @@ A stunning, native macOS music player built with SwiftUI, designed for audiophil
 
 ### ⚙️ Settings & Customization
 - **Appearance Settings** – Theme colors and visual preferences
-- **Audio Settings** – Replay gain, EQ, and karaoke preferences
+- **Audio Settings** – Replay gain and EQ preferences
 - **Library Settings** – Manage music folders and scanning
 - **About Section** – Library statistics and quick links
 
 ---
 
-## 📸 Screenshots
-### Main Player
-![Main Player](docs/screenshot_main.png)
-
-### Full-Screen Player
-![Full-Screen Player](docs/screenshot_fullscreen.png)
-
-### 10-Band Equalizer
-![Equalizer](docs/screenshot_equalizer.png)
-
-### Settings
-![Settings](docs/screenshot_settings.png)
-
-### Library View
-![Library](docs/screenshot_library.png)
-
----
 
 ## 📥 Installation
 

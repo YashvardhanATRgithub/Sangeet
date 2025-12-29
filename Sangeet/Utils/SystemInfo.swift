@@ -1,8 +1,8 @@
 //
 //  SystemInfo.swift
-//  HiFidelity
+//  Sangeet
 //
-//  Created by Varun Rathod on 03/11/25.
+//  Created by Yashvardhan on 03/11/25.
 //
 
 import Foundation
@@ -20,7 +20,7 @@ final class SystemInfo {
     /// Print all system information at app startup
     static func printStartupInfo() {
         Logger.info("═══════════════════════════════════════════════════════════")
-        Logger.info("🎵 HiFidelity - Startup System Information")
+        Logger.info("🎵 Sangeet - Startup System Information")
         Logger.info("═══════════════════════════════════════════════════════════")
         
         printApplicationInfo()

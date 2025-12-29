@@ -1,6 +1,6 @@
 //
 //  PlaybackController+Timer.swift
-//  HiFidelity
+//  Sangeet
 //
 //  Position update timer management
 //

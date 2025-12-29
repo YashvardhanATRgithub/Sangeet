@@ -381,7 +381,7 @@ struct MainView: View {
         window.title = ""
         window.styleMask.insert(.fullSizeContentView)
         
-        // Match HiFidelity style
+        // Match Sangeet style
         window.toolbar?.insertItem(withItemIdentifier: .init("separator"), at: 0)
         
         if let toolbar = window.toolbar {

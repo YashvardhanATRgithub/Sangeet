@@ -1,6 +1,6 @@
 //
 //  PlaybackController+Controls.swift
-//  HiFidelity
+//  Sangeet
 //
 //  Playback control methods (play, pause, stop, seek)
 //

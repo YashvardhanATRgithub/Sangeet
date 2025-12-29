@@ -1,6 +1,6 @@
 //
 //  PlaybackController+Volume.swift
-//  HiFidelity
+//  Sangeet
 //
 //  Volume control methods
 //

@@ -1,6 +1,6 @@
 //
 //  DBNormalizedEntities.swift
-//  HiFidelity
+//  Sangeet
 //
 //  Database operations for normalized entities (Albums, Artists, Genres)
 //

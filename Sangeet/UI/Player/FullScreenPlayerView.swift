@@ -56,13 +56,15 @@ struct FullScreenPlayerView: View {
                 // Main Content Area
                 if showLyrics, let track = playback.currentTrack {
                     // Split View: Artwork (Left) | Lyrics (Right)
-                    HStack(alignment: .center, spacing: 40) {
-                        // Left: Artwork + Info
+                    HStack(alignment: .center, spacing: 60) {
+                        Spacer()
+                        
+                        // Left: Artwork + Info (shifted more left)
                         VStack(spacing: 20) {
                             Spacer()
                             TrackArtworkView(
                                 track: track,
-                                maxSize: 280,
+                                maxSize: 260,
                                 cornerRadius: 20,
                                 iconSize: 70
                             )
@@ -79,21 +81,23 @@ struct FullScreenPlayerView: View {
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
                             }
-                            .frame(width: 280)
+                            .frame(width: 260)
                             Spacer()
                         }
-                        .frame(width: 320)
+                        .frame(width: 300)
                         
                         // Right: Lyrics
                         LyricsView(track: track, currentTime: playback.currentTime)
-                            .frame(maxWidth: 500, maxHeight: .infinity)
+                            .frame(maxWidth: 480, maxHeight: .infinity)
                             .background(
                                 RoundedRectangle(cornerRadius: 24)
                                     .fill(.ultraThinMaterial.opacity(0.5))
                             )
                             .clipShape(RoundedRectangle(cornerRadius: 24))
+                        
+                        Spacer()
                     }
-                    .padding(.horizontal, 40)
+                    .padding(.horizontal, 24)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                 } else {
                     // Standard View: Centered Artwork + Info
@@ -126,8 +130,8 @@ struct FullScreenPlayerView: View {
                 }
                 
                 // Controls Section (Fixed at bottom)
-                VStack(spacing: 24) {
-                    // Progress Bar
+                VStack(spacing: 20) {
+                    // Progress Bar (moved down by reducing top spacing)
                     VStack(spacing: 8) {
                         CustomProgressBar(
                             value: Binding(
@@ -148,7 +152,7 @@ struct FullScreenPlayerView: View {
                             Spacer()
                             Text(formatDuration(playback.duration))
                         }
-                        .font(.custom("Inter", size: 12).monospacedDigit()) // If font avail, else system
+                        .font(.custom("Inter", size: 12).monospacedDigit())
                         .font(.caption)
                         .foregroundStyle(.white.opacity(0.6))
                         .monospacedDigit()
@@ -195,12 +199,8 @@ struct FullScreenPlayerView: View {
                     }
                     .padding(.top, 16)
                     
-                    // Volume Slider (Sleek)
+                    // Volume Slider (Centered - no output device here)
                     HStack(spacing: 16) {
-                        // Output Device
-                        AudioOutputPicker(showLabel: false, iconOnly: true)
-                            .foregroundStyle(.white.opacity(0.7))
-                        
                         Button(action: { playback.toggleMute() }) {
                             Image(systemName: volumeIconName)
                                 .font(.body)
@@ -240,8 +240,12 @@ struct FullScreenPlayerView: View {
                         .frame(maxWidth: 240)
                     }
                     
-                    // Bottom Action Dock
-                    HStack(spacing: 48) {
+                    // Bottom Action Dock (includes output device picker)
+                    HStack(spacing: 40) {
+                        // Output Device Picker (moved here for symmetry)
+                        AudioOutputPicker(showLabel: false, iconOnly: true)
+                            .foregroundStyle(.white.opacity(0.6))
+                        
                         Button(action: { playback.toggleFavorite() }) {
                             Image(systemName: (playback.currentTrack?.isFavorite ?? false) ? "heart.fill" : "heart")
                                 .font(.title3)
@@ -281,8 +285,8 @@ struct FullScreenPlayerView: View {
                     .padding(.top, 10)
                 }
                 .padding(.horizontal, 24)
-                .padding(.bottom, 40)
-                .padding(.top, 10)
+                .padding(.bottom, 36)
+                .padding(.top, 4)
             }
         }
         .gesture(

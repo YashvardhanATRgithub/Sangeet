@@ -1,8 +1,8 @@
 //
 //  PlaybackController.swift
-//  HiFidelity
+//  Sangeet
 //
-//  Created by Varun Rathod on 31/10/25.
+//  Created by Yashvardhan on 31/10/25.
 //
 
 import Foundation

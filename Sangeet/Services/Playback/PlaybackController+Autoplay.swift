@@ -1,6 +1,6 @@
 //
 //  PlaybackController+Autoplay.swift
-//  HiFidelity
+//  Sangeet
 //
 //  Autoplay and recommendation logic
 //

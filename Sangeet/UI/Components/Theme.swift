@@ -1,13 +1,13 @@
 import SwiftUI
 
 enum Theme {
-    // HiFidelity uses a deeply dark neutral gray, standard macOS window background in dark mode.
+    // Sangeet uses a deeply dark neutral gray, standard macOS window background in dark mode.
     static let background = Color(nsColor: .windowBackgroundColor)
     static let panel = Color(nsColor: .windowBackgroundColor)
     
     static let separator = Color.white.opacity(0.1)
     
-    // HiFidelity uses specific yellow often, or blue. Sangeet accent is blue/cyan.
+    // Sangeet uses specific yellow often, or blue. Sangeet accent is blue/cyan.
     static var accent: Color {
         AppTheme.shared.currentTheme.primaryColor
     }

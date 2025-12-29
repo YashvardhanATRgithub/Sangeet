@@ -1,6 +1,6 @@
 //
 //  PlaybackController+NowPlaying.swift
-//  HiFidelity
+//  Sangeet
 //
 //  Now Playing Info management for Control Center and Lock Screen
 //

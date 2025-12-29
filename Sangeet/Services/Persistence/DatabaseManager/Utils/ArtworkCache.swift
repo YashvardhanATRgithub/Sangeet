@@ -1,8 +1,8 @@
 //
 //  ArtworkCache.swift
-//  HiFidelity
+//  Sangeet
 //
-//  Created by Varun Rathod on 03/11/25.
+//  Created by Yashvardhan on 03/11/25.
 //
 
 import Foundation
@@ -33,15 +33,15 @@ final class ArtworkCache {
     
     // Tracks entities known to have no artwork (avoid repeated DB queries)
     private let noArtworkSet = NSMutableSet()
-    private let noArtworkQueue = DispatchQueue(label: "com.hifidelity.noArtworkSet", attributes: .concurrent)
+    private let noArtworkQueue = DispatchQueue(label: "com.sangeet.noArtworkSet", attributes: .concurrent)
     
     // Processing queues
-    private let decodingQueue = DispatchQueue(label: "com.hifidelity.imageDecoding", qos: .userInitiated, attributes: .concurrent)
-    private let dbQueue = DispatchQueue(label: "com.hifidelity.artworkCache", qos: .userInitiated)
+    private let decodingQueue = DispatchQueue(label: "com.sangeet.imageDecoding", qos: .userInitiated, attributes: .concurrent)
+    private let dbQueue = DispatchQueue(label: "com.sangeet.artworkCache", qos: .userInitiated)
     
     // In-flight request tracking (prevent duplicate loads)
     private var inflightRequests = Set<String>()
-    private let inflightQueue = DispatchQueue(label: "com.hifidelity.inflightRequests")
+    private let inflightQueue = DispatchQueue(label: "com.sangeet.inflightRequests")
     
     // MARK: - Initialization
     

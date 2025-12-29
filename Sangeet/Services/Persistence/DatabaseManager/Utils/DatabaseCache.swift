@@ -1,8 +1,8 @@
 //
 //  DatabaseCache.swift
-//  HiFidelity
+//  Sangeet
 //
-//  Created by Varun Rathod on 03/11/25.
+//  Created by Yashvardhan on 03/11/25.
 //
 
 import Foundation
@@ -29,7 +29,7 @@ final class DatabaseCache: ObservableObject, @unchecked Sendable {
     @Published private(set) var isLoading = false
     
     // MARK: - Thread Safety
-    private let cacheQueue = DispatchQueue(label: "com.hifidelity.databasecache", attributes: .concurrent)
+    private let cacheQueue = DispatchQueue(label: "com.sangeet.databasecache", attributes: .concurrent)
     
     // MARK: - Cache State
     private var foldersCache: [Folder]?

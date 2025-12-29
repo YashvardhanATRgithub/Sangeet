@@ -49,7 +49,7 @@ struct EqualizerView: View {
                 .frame(height: 1)
                 .edgesIgnoringSafeArea(.horizontal)
             
-            // Main Content Area (HiFidelity style)
+            // Main Content Area (Sangeet style)
             VStack(spacing: 0) {
                 // Control bar
                 controlBar

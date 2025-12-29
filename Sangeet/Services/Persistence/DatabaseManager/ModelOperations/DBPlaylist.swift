@@ -1,6 +1,6 @@
 //
 //  DBPlaylist.swift
-//  HiFidelity
+//  Sangeet
 //
 //  Database operations for playlists and smart playlists
 //

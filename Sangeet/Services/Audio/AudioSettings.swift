@@ -1,8 +1,8 @@
 //
 //  AudioSettings.swift
-//  HiFidelity
+//  Sangeet
 //
-//  Created by Varun Rathod on 15/11/25.
+//  Created by Yashvardhan on 15/11/25.
 //
 
 import Foundation

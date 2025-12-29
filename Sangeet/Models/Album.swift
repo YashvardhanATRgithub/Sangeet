@@ -1,6 +1,6 @@
 //
 //  Album.swift
-//  HiFidelity
+//  Sangeet
 //
 //  Normalized album entity
 //

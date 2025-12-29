@@ -1,6 +1,6 @@
 //
 //  PlaybackController+Gapless.swift
-//  HiFidelity
+//  Sangeet
 //
 //  Gapless playback logic
 //

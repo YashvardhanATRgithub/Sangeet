@@ -1,6 +1,6 @@
 //
 //  TrackLyrics.swift
-//  HiFidelity
+//  Sangeet
 //
 //  Database model for synchronized lyrics storage
 //

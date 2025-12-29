@@ -1,6 +1,6 @@
 //
 //  LyricLine.swift
-//  HiFidelity
+//  Sangeet
 //
 //  LRC lyrics support with time-synchronized display
 //

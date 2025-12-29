@@ -1,8 +1,8 @@
 //
 //  BASSAudioEngine.swift
-//  HiFidelity
+//  Sangeet
 //
-//  Created by Varun Rathod on 14/11/25.
+//  Created by Yashvardhan on 14/11/25.
 //
 
 import Foundation

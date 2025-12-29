@@ -1,6 +1,6 @@
 //
 //  Playlist.swift
-//  HiFidelity
+//  Sangeet
 //
 //  User-created and smart playlists
 //

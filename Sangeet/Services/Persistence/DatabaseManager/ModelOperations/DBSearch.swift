@@ -1,6 +1,6 @@
 //
 //  DBSearch.swift
-//  HiFidelity
+//  Sangeet
 //
 //  Full-text search operations across all entities
 //

@@ -1,8 +1,8 @@
 //
 //  R128LoudnessScanner.swift
-//  HiFidelity
+//  Sangeet
 //
-//  Created by Varun Rathod on 22/12/25.
+//  Created by Yashvardhan on 22/12/25.
 //
 
 import Foundation

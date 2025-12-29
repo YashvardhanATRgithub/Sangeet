@@ -1,6 +1,6 @@
 //
 //  DBEntityTracks.swift
-//  HiFidelity
+//  Sangeet
 //
 //  Database operations for getting tracks by entity (Album, Artist, Genre)
 //

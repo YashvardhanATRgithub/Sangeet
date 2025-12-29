@@ -1,8 +1,8 @@
 //
 //  ReplayGainSettings.swift
-//  HiFidelity
+//  Sangeet
 //
-//  Created by Varun Rathod on 21/12/25.
+//  Created by Yashvardhan on 21/12/25.
 //
 
 import Foundation
