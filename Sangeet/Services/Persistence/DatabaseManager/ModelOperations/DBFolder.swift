@@ -393,12 +393,20 @@ extension DatabaseManager {
                         : "Removed \(removedCount) missing tracks from '\(folder.name)'"
                     NotificationManager.shared.addMessage(.info, message)
                 }
+                // INSTANT UI UPDATE
+                NotificationCenter.default.post(name: .libraryDataDidChange, object: nil)
+                NotificationCenter.default.post(name: .foldersDataDidChange, object: nil)
             }
         }
         
         // If no music files found and all tracks removed, we're done
         if totalFiles == 0 {
             try await updateFolderTrackCount(folder)
+            // Ensure UI is refreshed even on empty return
+            await MainActor.run {
+                NotificationCenter.default.post(name: .libraryDataDidChange, object: nil)
+                NotificationCenter.default.post(name: .foldersDataDidChange, object: nil)
+            }
             return
         }
 

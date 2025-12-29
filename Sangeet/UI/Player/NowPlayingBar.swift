@@ -193,6 +193,10 @@ struct NowPlayingBar: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
+                        .fixedSize()
+                    
+                    // Output Device
+                    AudioOutputPicker(showLabel: false, iconOnly: true)
                     
                     // Volume
                     HStack(spacing: 12) {
@@ -246,35 +250,6 @@ struct NowPlayingBar: View {
                     .hoverEffect()
                     .tourTarget(id: "tour-equalizer-button")
                     
-                    // 4. Karaoke (Instrumental)
-                    Button(action: {
-                        toggleKaraokeMode()
-                    }) {
-                        Image(systemName: effects.displayMode == .instrumental ? "music.mic" : "music.mic")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(effects.displayMode == .instrumental ? theme.currentTheme.primaryColor : .secondary)
-                            .frame(width: 32, height: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .hoverEffect()
-                    .tourTarget(id: "tour-karaoke-button")
-                    .help("Toggle Karaoke Mode")
-
-                    // 5. Vocals Only
-                    Button(action: {
-                        toggleVocalMode()
-                    }) {
-                        Image(systemName: effects.displayMode == .vocals ? "mic.fill" : "mic")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(effects.displayMode == .vocals ? theme.currentTheme.primaryColor : .secondary)
-                            .frame(width: 32, height: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .hoverEffect()
-                    .help("Play Vocals Only")
-                    
                     // Lyrics
                     Button(action: { onOpenLyrics?() }) {
                         Image(systemName: "quote.bubble")
@@ -320,73 +295,47 @@ struct NowPlayingBar: View {
         let seconds = Int(time) % 60
         return String(format: "%d:%02d", minutes, seconds)
     }
+}
+
+// MARK: - Components
+
+struct AudioOutputPicker: View {
+    @ObservedObject var dac = DACManager.shared
     
-    // MARK: - Karaoke Logic
+    var showLabel: Bool = false
+    var iconOnly: Bool = false
     
-    private func toggleKaraokeMode() {
-        guard let track = playback.currentTrack else { return }
-        
-        // Toggle Logic: If ON -> Turn OFF. If OFF or Vocals -> Turn ON.
-        if effects.displayMode == .instrumental {
-            // Revert to Original
-            playback.switchAudioSource(to: track.url)
-            effects.displayMode = .original
-        } else {
-            // Check existence
-            if let path = KaraokeEngine.shared.getInstrumentalPath(for: track) {
-                // Play Instrumental
-                playback.switchAudioSource(to: path)
-                effects.displayMode = .instrumental
-                onOpenLyrics?()
-            } else {
-                // Not found -> Create it
-                Task {
-                    do {
-                        let path = try await KaraokeEngine.shared.createInstrumental(for: track)
-                        await MainActor.run {
-                            playback.switchAudioSource(to: path)
-                            effects.displayMode = .instrumental
-                            onOpenLyrics?()
+    var body: some View {
+        Menu {
+            ForEach(dac.availableDevices) { device in
+                Button {
+                    dac.setDevice(id: device.id)
+                } label: {
+                    HStack {
+                        if device.id == dac.currentDeviceID {
+                            Image(systemName: "checkmark")
                         }
-                    } catch {
-                        Logger.error("Failed to create karaoke: \(error)")
+                        Text(device.name)
+                    }
+                }
+            }
+        } label: {
+            if iconOnly {
+                Image(systemName: "hifispeaker.2") // AVRoute picker style
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(width: 32, height: 44)
+            } else {
+                HStack(spacing: 6) {
+                    Image(systemName: "hifispeaker.2")
+                    if showLabel {
+                        Text(dac.currentDevice?.name ?? "Default")
+                            .font(.caption)
+                            .lineLimit(1)
                     }
                 }
             }
         }
-    }
-    
-    private func toggleVocalMode() {
-        guard let track = playback.currentTrack else { return }
-        
-        if effects.displayMode == .vocals {
-            // Revert
-            playback.switchAudioSource(to: track.url)
-            effects.displayMode = .original
-        } else {
-            // Check existence
-            if let path = KaraokeEngine.shared.getVocalsPath(for: track) {
-                playback.switchAudioSource(to: path)
-                effects.displayMode = .vocals
-            } else {
-                // Create
-                 Task {
-                    do {
-                        // This creates both files (instrumental + vocal)
-                        _ = try await KaraokeEngine.shared.createInstrumental(for: track) // Ignore return (it returns accom.)
-                        
-                        // We want vocals specifically
-                        if let vocalPath = KaraokeEngine.shared.getVocalsPath(for: track) {
-                            await MainActor.run {
-                                playback.switchAudioSource(to: vocalPath)
-                                effects.displayMode = .vocals
-                            }
-                        }
-                    } catch {
-                       Logger.error("Failed to create vocals: \(error)")
-                    }
-                }
-            }
-        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
     }
 }

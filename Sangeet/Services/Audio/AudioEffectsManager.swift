@@ -58,15 +58,6 @@ class AudioEffectsManager: ObservableObject {
     // Effect handles (for removing effects later)
     private var activeEffects: [String: HFX] = [:]
     
-    // Playback Modes
-    enum PlaybackMode {
-        case original
-        case instrumental  // Karaoke
-        case vocals
-    }
-    
-    @Published var displayMode: PlaybackMode = .original
-    
     // Internal Karaoke DSP Effect (Legacy/Real-time fallback) - REMOVED
     // We now use Spleeter (AI Separation)
     

@@ -35,6 +35,7 @@ class DACManager: ObservableObject {
     
     private var isHogging = false
     private var deviceListListenerProc: AudioObjectPropertyListenerProc?
+    private var defaultDeviceListenerProc: AudioObjectPropertyListenerProc?
     
     private init() {
         currentDeviceID = getDefaultOutputDevice()
@@ -387,26 +388,98 @@ extension DACManager {
             listenerProc,
             selfPtr
         )
-    }
-    
-    /// Remove device change listener
-    private func removeDeviceChangeListener() {
-        guard let listenerProc = deviceListListenerProc else { return }
         
-        var address = AudioObjectPropertyAddress(
-            mSelector: kAudioHardwarePropertyDevices,
+        // Also listen for Default Output Device changes (e.g. user switches in System Settings or auto-switch to Bluetooth)
+        var defaultDeviceAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )
         
-        let selfPtr = Unmanaged.passUnretained(self).toOpaque()
+        let defaultDeviceListenerProc: AudioObjectPropertyListenerProc = { _, _, _, clientData in
+            guard let clientData = clientData else { return noErr }
+            let manager = Unmanaged<DACManager>.fromOpaque(clientData).takeUnretainedValue()
+            
+            DispatchQueue.main.async {
+                manager.handleDefaultDeviceChanged()
+            }
+            return noErr
+        }
         
-        AudioObjectRemovePropertyListener(
+        self.defaultDeviceListenerProc = defaultDeviceListenerProc
+        
+        AudioObjectAddPropertyListener(
             AudioObjectID(kAudioObjectSystemObject),
-            &address,
-            listenerProc,
+            &defaultDeviceAddress,
+            defaultDeviceListenerProc,
             selfPtr
         )
+    }
+    
+    // Store proc reference to remove later
+    
+    /// Remove device change listener
+    private func removeDeviceChangeListener() {
+        let selfPtr = Unmanaged.passUnretained(self).toOpaque()
+        
+        if let listenerProc = deviceListListenerProc {
+            var address = AudioObjectPropertyAddress(
+                mSelector: kAudioHardwarePropertyDevices,
+                mScope: kAudioObjectPropertyScopeGlobal,
+                mElement: kAudioObjectPropertyElementMain
+            )
+            AudioObjectRemovePropertyListener(
+                AudioObjectID(kAudioObjectSystemObject),
+                &address,
+                listenerProc,
+                selfPtr
+            )
+        }
+        
+        if let defaultListener = defaultDeviceListenerProc {
+             var defaultDeviceAddress = AudioObjectPropertyAddress(
+                mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+                mScope: kAudioObjectPropertyScopeGlobal,
+                mElement: kAudioObjectPropertyElementMain
+            )
+            AudioObjectRemovePropertyListener(
+                AudioObjectID(kAudioObjectSystemObject),
+                &defaultDeviceAddress,
+                defaultListener,
+                selfPtr
+            )
+        }
+    }
+    
+    /// Handle System Default Device Change
+    private func handleDefaultDeviceChanged() {
+        let newDefaultID = getDefaultOutputDevice()
+        guard newDefaultID != 0, newDefaultID != currentDeviceID else { return }
+        
+        Logger.info("System Default Device Changed. Switching from \(currentDeviceID) to \(newDefaultID)")
+        
+        if let newDevice = availableDevices.first(where: { $0.id == newDefaultID }) {
+             self.currentDeviceID = newDefaultID
+             self.currentDevice = newDevice
+             
+             // Stabilize and Notify
+             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+                 NotificationCenter.default.post(name: .audioDeviceChanged, object: newDevice)
+                 self?.deviceWasRemoved = false
+             }
+        } else {
+            // Need to reload device list first if it's a new device
+            refreshDeviceList()
+            if let newDevice = availableDevices.first(where: { $0.id == newDefaultID }) {
+                 self.currentDeviceID = newDefaultID
+                 self.currentDevice = newDevice
+                 
+                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+                     NotificationCenter.default.post(name: .audioDeviceChanged, object: newDevice)
+                     self?.deviceWasRemoved = false
+                 }
+            }
+        }
     }
     
     /// Handle device list changes (hot-plugging)
@@ -596,6 +669,24 @@ extension DACManager {
     /// Update device when needed (called manually) - only used at app startup
     func updateDevice() {
         currentDeviceID = getDefaultOutputDevice()
+    }
+    
+    /// Set the current output device manually
+    func setDevice(id: AudioDeviceID) {
+        guard id != currentDeviceID else { return }
+        
+        if let newDevice = availableDevices.first(where: { $0.id == id }) {
+            Logger.info("Manually switching device to: \(newDevice.name)")
+            
+            self.currentDeviceID = id
+            self.currentDevice = newDevice
+            
+            // Notify BASS / Playback
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+                NotificationCenter.default.post(name: .audioDeviceChanged, object: newDevice)
+                self?.deviceWasRemoved = false
+            }
+        }
     }
     
     /// Refresh device info (without changing user's selected device)

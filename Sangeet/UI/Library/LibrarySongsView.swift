@@ -9,7 +9,10 @@ class LibraryViewModel: ObservableObject {
     init() {
         loadTracks()
         
-        NotificationCenter.default.addObserver(forName: .libraryDidUpdate, object: nil, queue: .main) { [weak self] _ in
+        NotificationCenter.default.addObserver(forName: .libraryDataDidChange, object: nil, queue: .main) { [weak self] _ in
+            self?.loadTracks()
+        }
+        NotificationCenter.default.addObserver(forName: .foldersDataDidChange, object: nil, queue: .main) { [weak self] _ in
             self?.loadTracks()
         }
     }
@@ -184,7 +187,7 @@ struct LibrarySongsView: View {
             searchFocused = false
         }
         // Removed .task { loadTracks() } -> Data is loaded by LibraryStore init
-        .onReceive(NotificationCenter.default.publisher(for: .libraryDidUpdate)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .libraryDataDidChange)) { _ in
             // LibraryStore handles its own updates, but if search is active, re-run search
             if !searchText.isEmpty {
                 performSearch(query: searchText)

@@ -280,6 +280,19 @@ struct MainView: View {
             applyBaseWindowStyleIfNeeded()
             // Start guided tour for first-time users
             GuidedTourManager.shared.checkAndStartTourIfNeeded()
+            // Force Home on Launch (as requested)
+            if selection == nil {
+                selection = .home
+            }
+        }
+        // Redirect to Songs when library updates (e.g. after import)
+        .onReceive(NotificationCenter.default.publisher(for: .foldersDataDidChange)) { _ in
+            // Only redirect if we are currently in a generic state or "Search" (user preference)
+            // The user requested "when imported folder it should be at songs section"
+            // We'll respect that.
+            withAnimation {
+                selection = .songs
+            }
         }
         // Open search view when search bar gains focus
         .onChange(of: isSearchFocused) { _, focused in
