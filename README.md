@@ -1,7 +1,7 @@
 # Sangeet 3.0
 > **The Ultimate Audiophile Music Player for macOS**
 
-![Project Walkthrough](path/to/walkthrough.gif)
+![Project Walkthrough](Screenshots/walkthrough.gif)
 
 Sangeet is a premium, native macOS music player built for audiophiles who demand bit-perfect audio quality without compromising on aesthetics. Powered by the industry-standard **BASS Audio Engine** and wrapped in a stunning **Glassmorphic SwiftUI** interface, Sangeet bridges the gap between professional audio tools and modern design.
 
@@ -35,13 +35,17 @@ Sangeet is a premium, native macOS music player built for audiophiles who demand
 
 ## 📸 Screenshots
 
-| Home & Library | Visual Equalizer |
+| Home & Full Player | Library (Artists & Albums) |
 |:---:|:---:|
-| ![Home View](path/to/screenshot_home.png) | ![EQ View](path/to/screenshot_eq.png) |
+| ![Home](Screenshots/home_screen.png) <br> ![Player](Screenshots/full_screen.png) | ![Artists](Screenshots/artists_screen.png) <br> ![Albums](Screenshots/albums_screen.png) |
 
-| Floating Dock | Radial Settings |
+| Songs & Playlists | Queue & Visual EQ |
 |:---:|:---:|
-| ![Floating Dock](path/to/screenshot_dock.png) | ![Settings](path/to/screenshot_settings.png) |
+| ![Songs](Screenshots/songs_screen.png) <br> ![Playlists](Screenshots/playlists_screen.png) | ![Queue](Screenshots/queue_screen.png) <br> ![EQ](Screenshots/eq_screen.png) |
+
+| Artist Grid & Metadata | Settings & Mini Player |
+|:---:|:---:|
+| ![Artist Grid](Screenshots/artist_grid.png) <br> ![Metadata](Screenshots/metadata.png) | ![Settings](Screenshots/settings.png) <br> *(Floating Dock)* |
 
 ---
 

@@ -1,29 +1,31 @@
-# .gitignore for Sangeet
-
 # Xcode
 .DS_Store
+*.swp
+*.lock
+*~
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+!*.xcodeproj/xcuserdata/
+
+# Build Folders
 build/
 DerivedData/
-*.pbxuser
-*.mode1v3
-*.mode2v3
-*.perspectivev3
-*.usercontent
-*.xccheckout
-*.moved-aside
-*.xcuserstate
-*.xcscmblueprint
+dmg_staging/
+dmg_temp/
+installer_assets/
 
-# Swift Package Manager
-.swiftpm/
-.build/
-Packages/
+# Large binaries & Installers
+*.dmg
+*.app
+*.zip
+*.pkg
 
-# CocoaPods
-Pods/
-*.xcworkspace
+# Heavy Media
+*.mov
+*.mp4
+Screenshots/walkthrough.mov
 
-# Others
-*.log
-Sangeet_Project_Temp/
-TempProject/
+# Temp
+pack.temp.dmg
+build_error.log

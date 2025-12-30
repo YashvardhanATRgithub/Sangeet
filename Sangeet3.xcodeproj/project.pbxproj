@@ -312,7 +312,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/Sangeet3/Data/Audio/BASS",
+					"$(SRCROOT)/Sangeet3/Data/Audio/BASS",
 				);
 				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = (
@@ -351,7 +351,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/Sangeet3/Data/Audio/BASS",
+					"$(SRCROOT)/Sangeet3/Data/Audio/BASS",
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.yashvardhan.Sangeet3;
