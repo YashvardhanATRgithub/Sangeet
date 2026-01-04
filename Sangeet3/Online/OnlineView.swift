@@ -100,6 +100,29 @@ struct OnlineView: View {
                                     .padding(.horizontal, 24)
                                 }
                             }
+                            
+                            // Legal Disclaimer
+                            VStack(spacing: 8) {
+                                Divider().background(Color.white.opacity(0.2))
+                                
+                                Text("Disclaimer")
+                                    .font(.caption.bold())
+                                    .foregroundStyle(SangeetTheme.textSecondary)
+                                    .padding(.top, 8)
+                                
+                                Text("This tool is provided for educational research purposes only. The developer assumes no liability for copyright infringement or misuse. Users are solely responsible for compliance with local laws and terms of service.")
+                                    .font(.caption2)
+                                    .foregroundStyle(.white.opacity(0.7))
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal, 40)
+                                    .lineSpacing(4)
+                            }
+                            .padding(.top, 16)
+                            .padding(.bottom, 20)
+                            
+                            // Bottom Spacer for Floating Dock
+                            Spacer()
+                                .frame(height: 120)
                         }
                         .padding(.vertical, 24)
                     }

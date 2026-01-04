@@ -59,24 +59,19 @@ class OnlineViewModel: ObservableObject {
             isLoading = true
             do {
                 if let url = try await tidalService.getStreamURL(trackID: track.id) {
-                    // Create a temporary Track object
+                    // Create a temporary Track object with artworkURL for display
                     let tempTrack = Track(
                         title: track.title,
                         artist: track.artistName,
                         album: track.albumName,
                         duration: TimeInterval(track.duration),
-                        fileURL: url, // Remote URL
-                        artworkData: nil // We will fetch artwork async or rely on placeholder
+                        fileURL: url,
+                        artworkData: nil,
+                        artworkURL: track.coverURL
                     )
                     
-                    // We might want to pass the cover URL to the playback manager or set metadata separately
-                    // For now, let's just play
                     playbackManager.play(tempTrack)
                     
-                    // Asynchronously load artwork
-                    if let _ = track.coverURL {
-                        // TODO: Fetch cover and update track
-                    }
                 } else {
                     errorMessage = "Could not get stream URL"
                 }
