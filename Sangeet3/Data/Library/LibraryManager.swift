@@ -46,7 +46,7 @@ final class LibraryManager: ObservableObject {
     private func setupLibrary() async {
         // Load initial folders and tracks
         // Load folders from DB
-        let folderRecords = try? await DatabaseManager.shared.read { db in
+        let folderRecords = try? DatabaseManager.shared.read { db in
             try FolderRecord.fetchAll(db)
         }
         
@@ -56,9 +56,13 @@ final class LibraryManager: ObservableObject {
                 var isStale = false
                 if let url = try? URL(resolvingBookmarkData: bookmark, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &isStale), !isStale {
                     resolvedFolders.append(url)
+                    // Start monitoring
+                    startMonitoring(folder: url)
                 }
             } else {
-                resolvedFolders.append(record.toURL())
+                let url = record.toURL()
+                resolvedFolders.append(url)
+                startMonitoring(folder: url)
             }
         }
         
@@ -67,7 +71,7 @@ final class LibraryManager: ObservableObject {
         }
         
         // Load tracks from database
-        let trackRecords = try? await DatabaseManager.shared.read { db in
+        let trackRecords = try? DatabaseManager.shared.read { db in
             try TrackRecord.fetchAll(db: db)
         }
         
@@ -76,9 +80,12 @@ final class LibraryManager: ObservableObject {
             self.rebuildIndexes()
         }
         
-        // If we have folders but no tracks, scan them
-        if !folders.isEmpty && tracks.isEmpty {
-            await scanAllFolders()
+        // Always scan folders to detect new files
+        if !folders.isEmpty {
+            // Run in detached task to avoid blocking main thread initialization
+            Task.detached(priority: .utility) { [weak self] in
+                await self?.scanAllFolders()
+            }
         }
         
         await loadPlaylists() // Ensure playlists are loaded
@@ -106,6 +113,7 @@ final class LibraryManager: ObservableObject {
                     if !folders.contains(url) {
                         await addFolderToDatabase(url)
                         folders.append(url)
+                        startMonitoring(folder: url) // Watch for changes
                         await scanFolder(url)
                     }
                 }
@@ -122,7 +130,7 @@ final class LibraryManager: ObservableObject {
             )
             
             let record = FolderRecord(url: url, bookmark: bookmarkData)
-            try DatabaseManager.shared.write { db in
+            _ = try DatabaseManager.shared.write { db in
                 try record.insert(db)
             }
         } catch {
@@ -135,6 +143,9 @@ final class LibraryManager: ObservableObject {
         tracks.removeAll { $0.fileURL.path.hasPrefix(url.path) }
         rebuildIndexes()
         
+        stopMonitoring(folder: url) // Stop watching
+        
+        
         // Remove from database
         do {
             try DatabaseManager.shared.write { db in
@@ -146,66 +157,125 @@ final class LibraryManager: ObservableObject {
         }
     }
     
+    // MARK: - Folder Monitoring
+    
+    private var folderMonitors: [URL: FolderMonitor] = [:]
+    
+    private func startMonitoring(folder: URL) {
+        // Stop existing if any
+        stopMonitoring(folder: folder)
+        
+        let monitor = FolderMonitor(url: folder)
+        monitor.onDidChange = { [weak self] in
+            // Debounce scan: Wait 2 seconds
+            // In a real app, use a Debouncer. For now, we'll just trigger task.
+            // DispatchSource already coalesces events somewhat.
+            Task {
+                try? await Task.sleep(nanoseconds: 2 * 1_000_000_000)
+                await self?.scanFolder(folder)
+            }
+        }
+        monitor.start()
+        folderMonitors[folder] = monitor
+    }
+    
+    private func stopMonitoring(folder: URL) {
+        folderMonitors[folder]?.stop()
+        folderMonitors[folder] = nil
+    }
+
     // MARK: - Scanning
     
     func scanAllFolders() async {
-        isScanning = true
-        scanProgress = "Starting scan..."
+        await MainActor.run {
+            self.isScanning = true
+            self.scanProgress = "Syncing library..."
+        }
         
         for folder in folders {
             await scanFolder(folder)
         }
         
-        isScanning = false
-        scanProgress = ""
+        await MainActor.run {
+            self.isScanning = false
+            self.scanProgress = ""
+        }
     }
     
     private func scanFolder(_ url: URL) async {
-        isScanning = true
+        await MainActor.run {
+            self.isScanning = true
+        }
         
         let accessing = url.startAccessingSecurityScopedResource()
         defer { if accessing { url.stopAccessingSecurityScopedResource() } }
         
-        scanProgress = "Scanning \(url.lastPathComponent)..."
+        // 1. Get ALL DB tracks for this folder (for pruning)
+        let dbTracks = (try? DatabaseManager.shared.read { db in
+            try TrackRecord
+                .filter(Column("folderPath") == url.path)
+                .fetchAll(db)
+        }) ?? []
         
+        var dbPaths = Set(dbTracks.map { $0.filePath })
+        
+        // 2. Scan File System
         let fileManager = FileManager.default
         guard let enumerator = fileManager.enumerator(
             at: url,
-            includingPropertiesForKeys: [.isRegularFileKey],
+            includingPropertiesForKeys: [.isRegularFileKey, .creationDateKey],
             options: [.skipsHiddenFiles]
         ) else {
-            isScanning = false
             return
         }
         
-        var newTracks: [Track] = []
-        var count = 0
+        let allFiles = enumerator.allObjects as? [URL] ?? []
         
-        for case let fileURL as URL in enumerator {
+        var newTracks: [Track] = []
+        var foundPaths: Set<String> = []
+        
+        for fileURL in allFiles {
             let ext = fileURL.pathExtension.lowercased()
             guard supportedExtensions.contains(ext) else { continue }
             
-            // Check if track already exists in database
-            let exists = (try? DatabaseManager.shared.read { db in
-                try TrackRecord.exists(filePath: fileURL.path, db: db)
-            }) ?? false
+            let path = fileURL.path
+            foundPaths.insert(path)
             
-            if exists { continue }
-            
-            count += 1
-            if count % 50 == 0 {
-                scanProgress = "Found \(count) new songs..."
+            // If exists in DB, remove from dbPaths (so remaining dbPaths are deletions)
+            if dbPaths.contains(path) {
+                dbPaths.remove(path)
+                continue
             }
             
+            // It's a new track
             let track = createTrackFast(from: fileURL)
             newTracks.append(track)
         }
         
-        // Add new tracks to memory and database
+        // 3. Process Deletions (Pruning)
+        // dbPaths now contains only paths that are in DB but NOT in File System
+        if !dbPaths.isEmpty {
+            await MainActor.run {
+                // Remove from memory
+                self.tracks.removeAll { dbPaths.contains($0.fileURL.path) }
+            }
+            // Remove from DB
+            DatabaseManager.shared.writeAsync { db in
+                try TrackRecord
+                    .filter(dbPaths.contains(Column("filePath")))
+                    .deleteAll(db)
+            }
+            print("[LibraryManager] Pruned \(dbPaths.count) deleted songs from \(url.lastPathComponent)")
+        }
+        
+        // 4. Process Additions
         if !newTracks.isEmpty {
-            tracks.append(contentsOf: newTracks)
-            tracks.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
-            rebuildIndexes()
+            await MainActor.run {
+                self.tracks.append(contentsOf: newTracks)
+                // Sort by Title for now; Date Added view handles its own sort
+                self.tracks.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+                self.rebuildIndexes()
+            }
             
             // Save to database
             DatabaseManager.shared.writeAsync { db in
@@ -214,7 +284,7 @@ final class LibraryManager: ObservableObject {
                 }
             }
             
-            scanProgress = "Found \(newTracks.count) new songs"
+            print("[LibraryManager] Added \(newTracks.count) new songs from \(url.lastPathComponent)")
             
             // Background metadata extraction
             Task.detached(priority: .background) { [weak self] in
@@ -222,7 +292,14 @@ final class LibraryManager: ObservableObject {
             }
         }
         
-        isScanning = false
+        // Update indexes if we deleted stuff
+        if !dbPaths.isEmpty || !newTracks.isEmpty {
+            await MainActor.run { self.rebuildIndexes() }
+        }
+        
+        await MainActor.run {
+            self.isScanning = false
+        }
     }
     
     private func createTrackFast(from url: URL) -> Track {
@@ -242,12 +319,20 @@ final class LibraryManager: ObservableObject {
         
         let album = url.deletingLastPathComponent().lastPathComponent
         
+        // Get Creation Date for correct "Recently Added" sorting
+        var dateAdded = Date()
+        if let resources = try? url.resourceValues(forKeys: [.creationDateKey]),
+           let creationDate = resources.creationDate {
+            dateAdded = creationDate
+        }
+        
         return Track(
             title: title,
             artist: artist,
             album: album,
             duration: 0,
-            fileURL: url
+            fileURL: url,
+            dateAdded: dateAdded // Use actual file creation date
         )
     }
     
@@ -280,7 +365,7 @@ final class LibraryManager: ObservableObject {
                     // Update in database
                     let updatedTrack = self.tracks[index]
                     DatabaseManager.shared.writeAsync { db in
-                        var record = TrackRecord(from: updatedTrack)
+                        let record = TrackRecord(from: updatedTrack)
                         try record.update(db)
                     }
                 }
@@ -299,7 +384,7 @@ final class LibraryManager: ObservableObject {
             rebuildIndexes()
             
             DatabaseManager.shared.writeAsync { db in
-                var record = TrackRecord(from: track)
+                let record = TrackRecord(from: track)
                 try record.update(db)
             }
         }
@@ -313,7 +398,7 @@ final class LibraryManager: ObservableObject {
             
             // Update in database
             DatabaseManager.shared.writeAsync { db in
-                var record = TrackRecord(from: self.tracks[index])
+                let record = TrackRecord(from: self.tracks[index])
                 try record.update(db)
             }
         }
@@ -326,7 +411,7 @@ final class LibraryManager: ObservableObject {
             
             // Update in database
             DatabaseManager.shared.writeAsync { db in
-                var record = TrackRecord(from: self.tracks[index])
+                let record = TrackRecord(from: self.tracks[index])
                 try record.update(db)
             }
             
@@ -351,9 +436,10 @@ final class LibraryManager: ObservableObject {
         let playlist = PlaylistRecord(name: name, isSystem: false)
         Task {
             do {
-                try await DatabaseManager.shared.write { db in
+                _ = try DatabaseManager.shared.write { db in
                     try playlist.insert(db)
                 }
+                print("[LibraryManager] Created playlist: '\(name)'")
                 await loadPlaylists()
             } catch {
                 print("[LibraryManager] Create playlist error: \(error)")
@@ -365,7 +451,7 @@ final class LibraryManager: ObservableObject {
         guard !playlist.isSystem else { return }
         Task {
             do {
-                try await DatabaseManager.shared.write { db in
+                _ = try DatabaseManager.shared.write { db in
                     try playlist.delete(db)
                 }
                 await loadPlaylists()
@@ -378,7 +464,18 @@ final class LibraryManager: ObservableObject {
     func addTrackToPlaylist(_ track: Track, playlist: PlaylistRecord) {
         Task {
             do {
-                try await DatabaseManager.shared.write { db in
+                _ = try DatabaseManager.shared.write { db in
+                    // Check if track already exists in playlist
+                    let existing = try PlaylistTrackRecord
+                        .filter(Column("playlistId") == playlist.id)
+                        .filter(Column("trackId") == track.id.uuidString)
+                        .fetchCount(db)
+                    
+                    guard existing == 0 else {
+                        print("[LibraryManager] Track already in playlist: \(playlist.name)")
+                        return
+                    }
+                    
                     // Get max position
                     let count = try PlaylistTrackRecord
                         .filter(Column("playlistId") == playlist.id)
@@ -391,6 +488,12 @@ final class LibraryManager: ObservableObject {
                         dateAdded: Date()
                     )
                     try record.insert(db)
+                    print("[LibraryManager] Added '\(track.title)' to playlist '\(playlist.name)'")
+                }
+                
+                // Notify UI to refresh
+                await MainActor.run {
+                    NotificationCenter.default.post(name: .playlistUpdated, object: playlist.id)
                 }
             } catch {
                 print("[LibraryManager] Add to playlist error: \(error)")
@@ -398,13 +501,35 @@ final class LibraryManager: ObservableObject {
         }
     }
     
+    func removeTrackFromPlaylist(_ track: Track, playlist: PlaylistRecord) {
+        Task {
+            do {
+                _ = try DatabaseManager.shared.write { db in
+                    try PlaylistTrackRecord
+                        .filter(Column("playlistId") == playlist.id)
+                        .filter(Column("trackId") == track.id.uuidString)
+                        .deleteAll(db)
+                }
+                print("[LibraryManager] Removed '\(track.title)' from playlist '\(playlist.name)'")
+                
+                // Notify UI to refresh
+                await MainActor.run {
+                    NotificationCenter.default.post(name: .playlistUpdated, object: playlist.id)
+                }
+            } catch {
+                print("[LibraryManager] Remove from playlist error: \(error)")
+            }
+        }
+    }
+    
     func loadPlaylists() async {
         do {
-            let records = try await DatabaseManager.shared.read { db in
+            let records = try DatabaseManager.shared.read { db in
                 try PlaylistRecord.order(Column("name")).fetchAll(db)
             }
             await MainActor.run {
                 self.playlists = records
+                print("[LibraryManager] Loaded \(records.count) playlists: \(records.map { $0.name })")
             }
         } catch {
             print("[LibraryManager] Load playlists error: \(error)")
@@ -413,7 +538,7 @@ final class LibraryManager: ObservableObject {
     
     func getTracks(for playlist: PlaylistRecord) async -> [Track] {
         do {
-            let trackIds = try await DatabaseManager.shared.read { db in
+            let trackIds = try DatabaseManager.shared.read { db in
                 try PlaylistTrackRecord
                     .filter(Column("playlistId") == playlist.id)
                     .order(Column("position"))
@@ -430,6 +555,18 @@ final class LibraryManager: ObservableObject {
         } catch {
             print("[LibraryManager] Get playlist tracks error: \(error)")
             return []
+        }
+    }
+    
+    func getTrackCount(for playlist: PlaylistRecord) -> Int {
+        do {
+            return try DatabaseManager.shared.read { db in
+                try PlaylistTrackRecord
+                    .filter(Column("playlistId") == playlist.id)
+                    .fetchCount(db)
+            }
+        } catch {
+            return 0
         }
     }
     

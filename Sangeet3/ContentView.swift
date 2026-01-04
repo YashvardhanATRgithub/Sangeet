@@ -33,21 +33,8 @@ struct ContentView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 
-                // Scan progress banner
-                if libraryManager.isScanning {
-                    HStack {
-                        ProgressView()
-                            .scaleEffect(0.7)
-                            .tint(SangeetTheme.primary)
-                        Text(libraryManager.scanProgress)
-                            .font(.caption)
-                            .foregroundStyle(SangeetTheme.textSecondary)
-                        Spacer()
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 8)
-                    .background(SangeetTheme.surface)
-                }
+                // Scan progress banner removed - User requested silence.
+
             }
             .overlay(alignment: .bottom) {
                 FloatingDock(showFullScreen: $showFullScreenPlayer, showQueue: $showQueueSidebar)

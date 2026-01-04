@@ -260,36 +260,7 @@ struct VisualEQSheet: View {
     @Environment(\.dismiss) var dismiss
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            HStack {
-                Text("Equalizer")
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                Spacer()
-                Button(action: { dismiss() }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.title2)
-                        .foregroundStyle(SangeetTheme.textMuted)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding()
-            .background(Color.black.opacity(0.2))
-            
-            // Content
-            VisualEQ()
-                .frame(height: 320)
-                .padding(24)
-        }
-        .background(SangeetTheme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.white.opacity(0.1), lineWidth: 1)
-        )
-        .padding(32)
-        .frame(width: 850)
+        EqualizerView()
     }
 }
 

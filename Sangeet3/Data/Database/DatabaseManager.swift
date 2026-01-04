@@ -148,6 +148,19 @@ final class DatabaseManager: ObservableObject {
             }
         }
         
+        // Version 4: Add dateCreated to eqPreset
+        migrator.registerMigration("v4_eq_preset_date") { db in
+            if try db.tableExists("eqPreset") {
+                // Check if column already exists
+                let columns = try db.columns(in: "eqPreset")
+                if !columns.contains(where: { $0.name == "dateCreated" }) {
+                    try db.alter(table: "eqPreset") { t in
+                        t.add(column: "dateCreated", .datetime).notNull().defaults(to: Date())
+                    }
+                }
+            }
+        }
+        
         return migrator
     }
     

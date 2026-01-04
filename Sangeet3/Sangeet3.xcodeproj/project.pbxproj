@@ -10,6 +10,54 @@
 		62DE57292F02BC4400A1D4EB /* libbass.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 62DE57282F02BC4400A1D4EB /* libbass.dylib */; };
 		62DE572A2F02BC4400A1D4EB /* libbass.dylib in Embed Libraries */ = {isa = PBXBuildFile; fileRef = 62DE57282F02BC4400A1D4EB /* libbass.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		62DE57392F02EF8F00A1D4EB /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 62DE57382F02EF8F00A1D4EB /* GRDB */; };
+		A00000000000000000000002 /* Sangeet3App.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000001 /* Sangeet3App.swift */; };
+		B00000000000000000000002 /* Data/Audio/PlaybackManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000001 /* Data/Audio/PlaybackManager.swift */; };
+		C00000000000000000000002 /* Data/Library/LibraryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C00000000000000000000001 /* Data/Library/LibraryManager.swift */; };
+		D00000000000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D00000000000000000000001 /* ContentView.swift */; };
+		E00000000000000000000002 /* Data/Database/Records/PlaylistRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00000000000000000000001 /* Data/Database/Records/PlaylistRecord.swift */; };
+		F00000000000000000000002 /* Data/Audio/EQManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000001 /* Data/Audio/EQManager.swift */; };
+		FFB00000 /* Sangeet3App.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00000 /* Sangeet3App.swift */; };
+		FFB00001 /* Data/Lyrics/LyricsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00001 /* Data/Lyrics/LyricsService.swift */; };
+		FFB00002 /* Data/Database/Records/TrackRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00002 /* Data/Database/Records/TrackRecord.swift */; };
+		FFB00003 /* Data/Database/Records/FolderRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00003 /* Data/Database/Records/FolderRecord.swift */; };
+		FFB00004 /* Data/Database/Records/EQPresetRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00004 /* Data/Database/Records/EQPresetRecord.swift */; };
+		FFB00005 /* Data/Database/Records/QueueStateRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00005 /* Data/Database/Records/QueueStateRecord.swift */; };
+		FFB00006 /* Data/Database/Records/PlaylistRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00006 /* Data/Database/Records/PlaylistRecord.swift */; };
+		FFB00007 /* Data/Database/DatabaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00007 /* Data/Database/DatabaseManager.swift */; };
+		FFB00008 /* Data/Library/LibraryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00008 /* Data/Library/LibraryManager.swift */; };
+		FFB00009 /* Data/Library/MetadataExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00009 /* Data/Library/MetadataExtractor.swift */; };
+		FFB00010 /* Data/Library/FolderMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00010 /* Data/Library/FolderMonitor.swift */; };
+		FFB00011 /* Data/Audio/EQManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00011 /* Data/Audio/EQManager.swift */; };
+		FFB00012 /* Data/Audio/LoudnessNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00012 /* Data/Audio/LoudnessNormalizer.swift */; };
+		FFB00013 /* Data/Audio/BASSEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00013 /* Data/Audio/BASSEngine.swift */; };
+		FFB00014 /* Data/Audio/SystemMediaManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00014 /* Data/Audio/SystemMediaManager.swift */; };
+		FFB00015 /* Data/Audio/DACManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00015 /* Data/Audio/DACManager.swift */; };
+		FFB00016 /* Data/Audio/AudiophileSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00016 /* Data/Audio/AudiophileSettings.swift */; };
+		FFB00017 /* Data/Audio/PlaybackManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00017 /* Data/Audio/PlaybackManager.swift */; };
+		FFB00018 /* Data/Metadata/SmartMetadataManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00018 /* Data/Metadata/SmartMetadataManager.swift */; };
+		FFB00019 /* Domain/Entities/Track.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00019 /* Domain/Entities/Track.swift */; };
+		FFB00020 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00020 /* ContentView.swift */; };
+		FFB00021 /* Presentation/Screens/Settings/SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00021 /* Presentation/Screens/Settings/SettingsView.swift */; };
+		FFB00022 /* Presentation/Screens/Home/HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00022 /* Presentation/Screens/Home/HomeView.swift */; };
+		FFB00023 /* Presentation/Screens/Playlists/PlaylistsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00023 /* Presentation/Screens/Playlists/PlaylistsView.swift */; };
+		FFB00024 /* Presentation/Screens/Library/LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00024 /* Presentation/Screens/Library/LibraryView.swift */; };
+		FFB00025 /* Presentation/Screens/Library/LibraryDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00025 /* Presentation/Screens/Library/LibraryDetailView.swift */; };
+		FFB00026 /* Presentation/Screens/Player/FullScreenPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00026 /* Presentation/Screens/Player/FullScreenPlayerView.swift */; };
+		FFB00027 /* Presentation/Components/GlobalSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00027 /* Presentation/Components/GlobalSearch.swift */; };
+		FFB00028 /* Presentation/Components/CompactAudioOutputPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00028 /* Presentation/Components/CompactAudioOutputPicker.swift */; };
+		FFB00029 /* Presentation/Components/UniversalSongRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00029 /* Presentation/Components/UniversalSongRow.swift */; };
+		FFB00030 /* Presentation/Components/HeartButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00030 /* Presentation/Components/HeartButton.swift */; };
+		FFB00031 /* Presentation/Components/TopTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00031 /* Presentation/Components/TopTabBar.swift */; };
+		FFB00042 /* Presentation/Components/EqualizerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00042 /* Presentation/Components/EqualizerView.swift */; };
+		FFB00033 /* Presentation/Components/SwipeBackDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00033 /* Presentation/Components/SwipeBackDetector.swift */; };
+		FFB00034 /* Presentation/Components/LyricsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00034 /* Presentation/Components/LyricsView.swift */; };
+		FFB00035 /* Presentation/Components/QueueSidebar.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00035 /* Presentation/Components/QueueSidebar.swift */; };
+		FFB00036 /* Presentation/Components/FloatingDock.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00036 /* Presentation/Components/FloatingDock.swift */; };
+		FFB00037 /* Presentation/Components/LibraryInspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00037 /* Presentation/Components/LibraryInspectorView.swift */; };
+		FFB00038 /* Presentation/Components/QueueDropDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00038 /* Presentation/Components/QueueDropDelegate.swift */; };
+		FFB00039 /* Presentation/Components/ProgressLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00039 /* Presentation/Components/ProgressLine.swift */; };
+		FFB00040 /* Presentation/Components/ArtworkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00040 /* Presentation/Components/ArtworkView.swift */; };
+		FFB00041 /* Presentation/Theme/SangeetTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00041 /* Presentation/Theme/SangeetTheme.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -29,6 +77,54 @@
 /* Begin PBXFileReference section */
 		62DE55DD2F028D9000A1D4EB /* Sangeet3.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Sangeet3.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		62DE57282F02BC4400A1D4EB /* libbass.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libbass.dylib; path = "../../../Downloads/bass24-osx/libbass.dylib"; sourceTree = "<group>"; };
+		A00000000000000000000001 /* Sangeet3App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sangeet3App.swift; sourceTree = "<group>"; };
+		B00000000000000000000001 /* Data/Audio/PlaybackManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data/Audio/PlaybackManager.swift; sourceTree = "<group>"; };
+		C00000000000000000000001 /* Data/Library/LibraryManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data/Library/LibraryManager.swift; sourceTree = "<group>"; };
+		D00000000000000000000001 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		E00000000000000000000001 /* Data/Database/Records/PlaylistRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data/Database/Records/PlaylistRecord.swift; sourceTree = "<group>"; };
+		F00000000000000000000001 /* Data/Audio/EQManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data/Audio/EQManager.swift; sourceTree = "<group>"; };
+		FFA00000 /* Sangeet3App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sangeet3App.swift; sourceTree = "<group>"; };
+		FFA00001 /* Data/Lyrics/LyricsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data/Lyrics/LyricsService.swift; sourceTree = "<group>"; };
+		FFA00002 /* Data/Database/Records/TrackRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data/Database/Records/TrackRecord.swift; sourceTree = "<group>"; };
+		FFA00003 /* Data/Database/Records/FolderRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data/Database/Records/FolderRecord.swift; sourceTree = "<group>"; };
+		FFA00004 /* Data/Database/Records/EQPresetRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data/Database/Records/EQPresetRecord.swift; sourceTree = "<group>"; };
+		FFA00005 /* Data/Database/Records/QueueStateRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data/Database/Records/QueueStateRecord.swift; sourceTree = "<group>"; };
+		FFA00006 /* Data/Database/Records/PlaylistRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data/Database/Records/PlaylistRecord.swift; sourceTree = "<group>"; };
+		FFA00007 /* Data/Database/DatabaseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data/Database/DatabaseManager.swift; sourceTree = "<group>"; };
+		FFA00008 /* Data/Library/LibraryManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data/Library/LibraryManager.swift; sourceTree = "<group>"; };
+		FFA00009 /* Data/Library/MetadataExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data/Library/MetadataExtractor.swift; sourceTree = "<group>"; };
+		FFA00010 /* Data/Library/FolderMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data/Library/FolderMonitor.swift; sourceTree = "<group>"; };
+		FFA00011 /* Data/Audio/EQManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data/Audio/EQManager.swift; sourceTree = "<group>"; };
+		FFA00012 /* Data/Audio/LoudnessNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data/Audio/LoudnessNormalizer.swift; sourceTree = "<group>"; };
+		FFA00013 /* Data/Audio/BASSEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data/Audio/BASSEngine.swift; sourceTree = "<group>"; };
+		FFA00014 /* Data/Audio/SystemMediaManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data/Audio/SystemMediaManager.swift; sourceTree = "<group>"; };
+		FFA00015 /* Data/Audio/DACManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data/Audio/DACManager.swift; sourceTree = "<group>"; };
+		FFA00016 /* Data/Audio/AudiophileSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data/Audio/AudiophileSettings.swift; sourceTree = "<group>"; };
+		FFA00017 /* Data/Audio/PlaybackManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data/Audio/PlaybackManager.swift; sourceTree = "<group>"; };
+		FFA00018 /* Data/Metadata/SmartMetadataManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data/Metadata/SmartMetadataManager.swift; sourceTree = "<group>"; };
+		FFA00019 /* Domain/Entities/Track.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/Entities/Track.swift; sourceTree = "<group>"; };
+		FFA00020 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		FFA00021 /* Presentation/Screens/Settings/SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Screens/Settings/SettingsView.swift; sourceTree = "<group>"; };
+		FFA00022 /* Presentation/Screens/Home/HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Screens/Home/HomeView.swift; sourceTree = "<group>"; };
+		FFA00023 /* Presentation/Screens/Playlists/PlaylistsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Screens/Playlists/PlaylistsView.swift; sourceTree = "<group>"; };
+		FFA00024 /* Presentation/Screens/Library/LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Screens/Library/LibraryView.swift; sourceTree = "<group>"; };
+		FFA00025 /* Presentation/Screens/Library/LibraryDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Screens/Library/LibraryDetailView.swift; sourceTree = "<group>"; };
+		FFA00026 /* Presentation/Screens/Player/FullScreenPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Screens/Player/FullScreenPlayerView.swift; sourceTree = "<group>"; };
+		FFA00027 /* Presentation/Components/GlobalSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Components/GlobalSearch.swift; sourceTree = "<group>"; };
+		FFA00028 /* Presentation/Components/CompactAudioOutputPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Components/CompactAudioOutputPicker.swift; sourceTree = "<group>"; };
+		FFA00029 /* Presentation/Components/UniversalSongRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Components/UniversalSongRow.swift; sourceTree = "<group>"; };
+		FFA00030 /* Presentation/Components/HeartButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Components/HeartButton.swift; sourceTree = "<group>"; };
+		FFA00031 /* Presentation/Components/TopTabBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Components/TopTabBar.swift; sourceTree = "<group>"; };
+		FFA00042 /* Presentation/Components/EqualizerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Components/EqualizerView.swift; sourceTree = "<group>"; };
+		FFA00033 /* Presentation/Components/SwipeBackDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Components/SwipeBackDetector.swift; sourceTree = "<group>"; };
+		FFA00034 /* Presentation/Components/LyricsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Components/LyricsView.swift; sourceTree = "<group>"; };
+		FFA00035 /* Presentation/Components/QueueSidebar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Components/QueueSidebar.swift; sourceTree = "<group>"; };
+		FFA00036 /* Presentation/Components/FloatingDock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Components/FloatingDock.swift; sourceTree = "<group>"; };
+		FFA00037 /* Presentation/Components/LibraryInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Components/LibraryInspectorView.swift; sourceTree = "<group>"; };
+		FFA00038 /* Presentation/Components/QueueDropDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Components/QueueDropDelegate.swift; sourceTree = "<group>"; };
+		FFA00039 /* Presentation/Components/ProgressLine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Components/ProgressLine.swift; sourceTree = "<group>"; };
+		FFA00040 /* Presentation/Components/ArtworkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Components/ArtworkView.swift; sourceTree = "<group>"; };
+		FFA00041 /* Presentation/Theme/SangeetTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Theme/SangeetTheme.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -52,12 +148,68 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		62AE3AF62F05674400D8EFAA /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				FFA00000 /* Sangeet3App.swift */,
+			);
+			name = "Recovered References";
+			sourceTree = "<group>";
+		};
 		62DE55D42F028D9000A1D4EB = {
 			isa = PBXGroup;
 			children = (
+				A00000000000000000000001 /* Sangeet3App.swift */,
+				FFA00001 /* Data/Lyrics/LyricsService.swift */,
+				FFA00002 /* Data/Database/Records/TrackRecord.swift */,
+				FFA00003 /* Data/Database/Records/FolderRecord.swift */,
+				FFA00004 /* Data/Database/Records/EQPresetRecord.swift */,
+				FFA00005 /* Data/Database/Records/QueueStateRecord.swift */,
+				FFA00006 /* Data/Database/Records/PlaylistRecord.swift */,
+				FFA00007 /* Data/Database/DatabaseManager.swift */,
+				FFA00008 /* Data/Library/LibraryManager.swift */,
+				FFA00009 /* Data/Library/MetadataExtractor.swift */,
+				FFA00010 /* Data/Library/FolderMonitor.swift */,
+				FFA00011 /* Data/Audio/EQManager.swift */,
+				FFA00012 /* Data/Audio/LoudnessNormalizer.swift */,
+				FFA00013 /* Data/Audio/BASSEngine.swift */,
+				FFA00014 /* Data/Audio/SystemMediaManager.swift */,
+				FFA00015 /* Data/Audio/DACManager.swift */,
+				FFA00016 /* Data/Audio/AudiophileSettings.swift */,
+				FFA00017 /* Data/Audio/PlaybackManager.swift */,
+				FFA00018 /* Data/Metadata/SmartMetadataManager.swift */,
+				FFA00019 /* Domain/Entities/Track.swift */,
+				FFA00020 /* ContentView.swift */,
+				FFA00021 /* Presentation/Screens/Settings/SettingsView.swift */,
+				FFA00022 /* Presentation/Screens/Home/HomeView.swift */,
+				FFA00023 /* Presentation/Screens/Playlists/PlaylistsView.swift */,
+				FFA00024 /* Presentation/Screens/Library/LibraryView.swift */,
+				FFA00025 /* Presentation/Screens/Library/LibraryDetailView.swift */,
+				FFA00026 /* Presentation/Screens/Player/FullScreenPlayerView.swift */,
+				FFA00027 /* Presentation/Components/GlobalSearch.swift */,
+				FFA00028 /* Presentation/Components/CompactAudioOutputPicker.swift */,
+				FFA00029 /* Presentation/Components/UniversalSongRow.swift */,
+				FFA00030 /* Presentation/Components/HeartButton.swift */,
+				FFA00031 /* Presentation/Components/TopTabBar.swift */,
+				FFA00042 /* Presentation/Components/EqualizerView.swift */,
+				FFA00033 /* Presentation/Components/SwipeBackDetector.swift */,
+				FFA00034 /* Presentation/Components/LyricsView.swift */,
+				FFA00035 /* Presentation/Components/QueueSidebar.swift */,
+				FFA00036 /* Presentation/Components/FloatingDock.swift */,
+				FFA00037 /* Presentation/Components/LibraryInspectorView.swift */,
+				FFA00038 /* Presentation/Components/QueueDropDelegate.swift */,
+				FFA00039 /* Presentation/Components/ProgressLine.swift */,
+				FFA00040 /* Presentation/Components/ArtworkView.swift */,
+				FFA00041 /* Presentation/Theme/SangeetTheme.swift */,
+				B00000000000000000000001 /* Data/Audio/PlaybackManager.swift */,
+				C00000000000000000000001 /* Data/Library/LibraryManager.swift */,
+				D00000000000000000000001 /* ContentView.swift */,
+				E00000000000000000000001 /* Data/Database/Records/PlaylistRecord.swift */,
+				F00000000000000000000001 /* Data/Audio/EQManager.swift */,
 				62DE55DF2F028D9000A1D4EB /* Sangeet3 */,
 				62DE56D62F02B31600A1D4EB /* Frameworks */,
 				62DE55DE2F028D9000A1D4EB /* Products */,
+				62AE3AF62F05674400D8EFAA /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
@@ -156,6 +308,95 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A00000000000000000000002 /* Sangeet3App.swift in Sources */,
+				B00000000000000000000002 /* Data/Audio/PlaybackManager.swift in Sources */,
+				C00000000000000000000002 /* Data/Library/LibraryManager.swift in Sources */,
+				D00000000000000000000002 /* ContentView.swift in Sources */,
+				E00000000000000000000002 /* Data/Database/Records/PlaylistRecord.swift in Sources */,
+				F00000000000000000000002 /* Data/Audio/EQManager.swift in Sources */,
+				FFB00000 /* Sangeet3App.swift in Sources */,
+				FFB00001 /* Data/Lyrics/LyricsService.swift in Sources */,
+				FFB00002 /* Data/Database/Records/TrackRecord.swift in Sources */,
+				FFB00003 /* Data/Database/Records/FolderRecord.swift in Sources */,
+				FFB00004 /* Data/Database/Records/EQPresetRecord.swift in Sources */,
+				FFB00005 /* Data/Database/Records/QueueStateRecord.swift in Sources */,
+				FFB00006 /* Data/Database/Records/PlaylistRecord.swift in Sources */,
+				FFB00007 /* Data/Database/DatabaseManager.swift in Sources */,
+				FFB00008 /* Data/Library/LibraryManager.swift in Sources */,
+				FFB00009 /* Data/Library/MetadataExtractor.swift in Sources */,
+				FFB00010 /* Data/Library/FolderMonitor.swift in Sources */,
+				FFB00011 /* Data/Audio/EQManager.swift in Sources */,
+				FFB00012 /* Data/Audio/LoudnessNormalizer.swift in Sources */,
+				FFB00013 /* Data/Audio/BASSEngine.swift in Sources */,
+				FFB00014 /* Data/Audio/SystemMediaManager.swift in Sources */,
+				FFB00015 /* Data/Audio/DACManager.swift in Sources */,
+				FFB00016 /* Data/Audio/AudiophileSettings.swift in Sources */,
+				FFB00017 /* Data/Audio/PlaybackManager.swift in Sources */,
+				FFB00018 /* Data/Metadata/SmartMetadataManager.swift in Sources */,
+				FFB00019 /* Domain/Entities/Track.swift in Sources */,
+				FFB00020 /* ContentView.swift in Sources */,
+				FFB00021 /* Presentation/Screens/Settings/SettingsView.swift in Sources */,
+				FFB00022 /* Presentation/Screens/Home/HomeView.swift in Sources */,
+				FFB00023 /* Presentation/Screens/Playlists/PlaylistsView.swift in Sources */,
+				FFB00024 /* Presentation/Screens/Library/LibraryView.swift in Sources */,
+				FFB00025 /* Presentation/Screens/Library/LibraryDetailView.swift in Sources */,
+				FFB00026 /* Presentation/Screens/Player/FullScreenPlayerView.swift in Sources */,
+				FFB00027 /* Presentation/Components/GlobalSearch.swift in Sources */,
+				FFB00028 /* Presentation/Components/CompactAudioOutputPicker.swift in Sources */,
+				FFB00029 /* Presentation/Components/UniversalSongRow.swift in Sources */,
+				FFB00030 /* Presentation/Components/HeartButton.swift in Sources */,
+				FFB00031 /* Presentation/Components/TopTabBar.swift in Sources */,
+				FFB00042 /* Presentation/Components/EqualizerView.swift in Sources */,
+				FFB00033 /* Presentation/Components/SwipeBackDetector.swift in Sources */,
+				FFB00034 /* Presentation/Components/LyricsView.swift in Sources */,
+				FFB00035 /* Presentation/Components/QueueSidebar.swift in Sources */,
+				FFB00036 /* Presentation/Components/FloatingDock.swift in Sources */,
+				FFB00037 /* Presentation/Components/LibraryInspectorView.swift in Sources */,
+				FFB00038 /* Presentation/Components/QueueDropDelegate.swift in Sources */,
+				FFB00039 /* Presentation/Components/ProgressLine.swift in Sources */,
+				FFB00040 /* Presentation/Components/ArtworkView.swift in Sources */,
+				FFB00041 /* Presentation/Theme/SangeetTheme.swift in Sources */,
+				FFB00001 /* Data/Lyrics/LyricsService.swift in Sources */,
+				FFB00002 /* Data/Database/Records/TrackRecord.swift in Sources */,
+				FFB00003 /* Data/Database/Records/FolderRecord.swift in Sources */,
+				FFB00004 /* Data/Database/Records/EQPresetRecord.swift in Sources */,
+				FFB00005 /* Data/Database/Records/QueueStateRecord.swift in Sources */,
+				FFB00006 /* Data/Database/Records/PlaylistRecord.swift in Sources */,
+				FFB00007 /* Data/Database/DatabaseManager.swift in Sources */,
+				FFB00008 /* Data/Library/LibraryManager.swift in Sources */,
+				FFB00009 /* Data/Library/MetadataExtractor.swift in Sources */,
+				FFB00010 /* Data/Library/FolderMonitor.swift in Sources */,
+				FFB00011 /* Data/Audio/EQManager.swift in Sources */,
+				FFB00012 /* Data/Audio/LoudnessNormalizer.swift in Sources */,
+				FFB00013 /* Data/Audio/BASSEngine.swift in Sources */,
+				FFB00014 /* Data/Audio/SystemMediaManager.swift in Sources */,
+				FFB00015 /* Data/Audio/DACManager.swift in Sources */,
+				FFB00016 /* Data/Audio/AudiophileSettings.swift in Sources */,
+				FFB00017 /* Data/Audio/PlaybackManager.swift in Sources */,
+				FFB00018 /* Data/Metadata/SmartMetadataManager.swift in Sources */,
+				FFB00019 /* Domain/Entities/Track.swift in Sources */,
+				FFB00020 /* ContentView.swift in Sources */,
+				FFB00021 /* Presentation/Screens/Settings/SettingsView.swift in Sources */,
+				FFB00022 /* Presentation/Screens/Home/HomeView.swift in Sources */,
+				FFB00023 /* Presentation/Screens/Playlists/PlaylistsView.swift in Sources */,
+				FFB00024 /* Presentation/Screens/Library/LibraryView.swift in Sources */,
+				FFB00025 /* Presentation/Screens/Library/LibraryDetailView.swift in Sources */,
+				FFB00026 /* Presentation/Screens/Player/FullScreenPlayerView.swift in Sources */,
+				FFB00027 /* Presentation/Components/GlobalSearch.swift in Sources */,
+				FFB00028 /* Presentation/Components/CompactAudioOutputPicker.swift in Sources */,
+				FFB00029 /* Presentation/Components/UniversalSongRow.swift in Sources */,
+				FFB00030 /* Presentation/Components/HeartButton.swift in Sources */,
+				FFB00031 /* Presentation/Components/TopTabBar.swift in Sources */,
+				FFB00042 /* Presentation/Components/EqualizerView.swift in Sources */,
+				FFB00033 /* Presentation/Components/SwipeBackDetector.swift in Sources */,
+				FFB00034 /* Presentation/Components/LyricsView.swift in Sources */,
+				FFB00035 /* Presentation/Components/QueueSidebar.swift in Sources */,
+				FFB00036 /* Presentation/Components/FloatingDock.swift in Sources */,
+				FFB00037 /* Presentation/Components/LibraryInspectorView.swift in Sources */,
+				FFB00038 /* Presentation/Components/QueueDropDelegate.swift in Sources */,
+				FFB00039 /* Presentation/Components/ProgressLine.swift in Sources */,
+				FFB00040 /* Presentation/Components/ArtworkView.swift in Sources */,
+				FFB00041 /* Presentation/Theme/SangeetTheme.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -299,7 +540,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/Sangeet3/Data/Audio/BASS",
+					"$(PROJECT_DIR)/Data/Audio/BASS",
 				);
 				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = (
@@ -313,7 +554,7 @@
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_INCLUDE_PATHS = Sangeet3/Data/Audio/BASS;
+				SWIFT_INCLUDE_PATHS = Data/Audio/BASS;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 			};
@@ -338,7 +579,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/Sangeet3/Data/Audio/BASS",
+					"$(PROJECT_DIR)/Data/Audio/BASS",
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.yashvardhan.Sangeet3;
@@ -348,7 +589,7 @@
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_INCLUDE_PATHS = Sangeet3/Data/Audio/BASS;
+				SWIFT_INCLUDE_PATHS = Data/Audio/BASS;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 			};

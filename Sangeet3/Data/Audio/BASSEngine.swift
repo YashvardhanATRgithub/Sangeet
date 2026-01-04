@@ -597,5 +597,10 @@ final class BASSEngine: ObservableObject {
         BASS_ChannelGetAttribute(currentStream, DWORD(BASS_ATTRIB_FREQ), &freq)
         return Double(freq)
     }
+    
+    /// Get current active stream (for EQ attachment)
+    func getCurrentStream() -> HSTREAM {
+        return currentStream
+    }
 }
 

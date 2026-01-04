@@ -165,6 +165,9 @@ final class PlaybackManager: ObservableObject {
     func play(_ track: Track) {
         guard !isTransitioning else { return }
         
+        // Check if we should crossfade (a song is currently playing)
+        let shouldCrossfade = crossfadeEnabled && isPlaying && currentTrack != nil
+        
         // Update UI first (instant response)
         currentTrack = track
         isPlaying = true
@@ -187,35 +190,70 @@ final class PlaybackManager: ObservableObject {
         let image = track.artworkData.flatMap { NSImage(data: $0) }
         SystemMediaManager.shared.updateNowPlaying(track: track, image: image)
         
-        // Load and play
-        do {
-            try player.load(url: track.fileURL) { [weak self] in
-                self?.handleTrackEnd()
-            }
-            
-            // Bit-Perfect mode: bypass EQ
-            let bitPerfect = UserDefaults.standard.bool(forKey: "bitPerfectOutput")
-            if !bitPerfect {
-                // Attach EQ only if not in bit-perfect mode
-                Task { @MainActor in
-                    EQManager.shared.attachToStream(0)  // EQ attachment happens in BASSEngine
+        // Load and play - use crossfade if enabled and already playing
+        var crossfadeSucceeded = false
+        
+        if shouldCrossfade {
+            // Use crossfade for smooth transition
+            isTransitioning = true
+            do {
+                try player.crossfadeLoad(
+                    url: track.fileURL,
+                    duration: crossfadeDuration,
+                    onEnd: { [weak self] in
+                        self?.handleTrackEnd()
+                    }
+                )
+                isTransitioning = false
+                crossfadeSucceeded = true
+                
+                if duration == 0 {
+                    duration = player.duration
                 }
+                
+                // Preload next track for gapless
+                if seamlessPlaybackEnabled {
+                    preloadNextTrack()
+                }
+                
+            } catch {
+                isTransitioning = false
+                crossfadeSucceeded = false
+                print("[PlaybackManager] Crossfade play error: \(error), falling back to normal play")
             }
-            
-            player.play()
-            
-            if duration == 0 {
-                duration = player.duration
+        }
+        
+        // Normal load (no crossfade requested, or crossfade failed)
+        if !crossfadeSucceeded {
+            do {
+                try player.load(url: track.fileURL) { [weak self] in
+                    self?.handleTrackEnd()
+                }
+                
+                // Bit-Perfect mode: bypass EQ
+                let bitPerfect = UserDefaults.standard.bool(forKey: "bitPerfectOutput")
+                if !bitPerfect {
+                    // Attach EQ only if not in bit-perfect mode
+                    Task { @MainActor in
+                        EQManager.shared.attachToStream(0)  // EQ attachment happens in BASSEngine
+                    }
+                }
+                
+                player.play()
+                
+                if duration == 0 {
+                    duration = player.duration
+                }
+                
+                // Preload next track for gapless
+                if seamlessPlaybackEnabled {
+                    preloadNextTrack()
+                }
+                
+            } catch {
+                isPlaying = false
+                print("[PlaybackManager] Error: \(error)")
             }
-            
-            // Preload next track for gapless
-            if seamlessPlaybackEnabled {
-                preloadNextTrack()
-            }
-            
-        } catch {
-            isPlaying = false
-            print("[PlaybackManager] Error: \(error)")
         }
         
         saveState()
@@ -690,7 +728,7 @@ final class PlaybackManager: ObservableObject {
     
     func moveQueueItems(from source: IndexSet, to destination: Int) {
         // Adjust destination if needed
-        var adjustedDest = destination
+        let adjustedDest = destination
         
         // Logic to keep queueIndex pointing to correct song if moved
         // Complex if the current song itself moves.
@@ -766,7 +804,7 @@ final class PlaybackManager: ObservableObject {
     func restoreState() {
         Task {
             // Read record
-            guard let record = try? await DatabaseManager.shared.read({ db in
+            guard let record = try? DatabaseManager.shared.read({ db in
                 try QueueStateRecord.load(db: db)
             }) else { return }
             

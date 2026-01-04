@@ -61,7 +61,7 @@ struct PlaylistsView: View {
                             ForEach(libraryManager.playlists) { playlist in
                                 PlaylistCard(
                                     name: playlist.name,
-                                    count: 0,
+                                    count: libraryManager.getTrackCount(for: playlist),
                                     icon: "music.note.list",
                                     color: SangeetTheme.secondary
                                 )
@@ -204,6 +204,35 @@ struct PlaylistDetailView: View {
                 LazyVStack(spacing: 0) {
                     ForEach(tracks) { track in
                         UniversalSongRow(track: track, selectedTrack: $selectedTrack)
+                            .contextMenu {
+                                Button {
+                                    libraryManager.toggleFavorite(track)
+                                } label: {
+                                    let isFav = libraryManager.tracks.first(where: { $0.id == track.id })?.isFavorite ?? false
+                                    Label(isFav ? "Unfavorite" : "Favorite", systemImage: isFav ? "heart.slash" : "heart")
+                                }
+                                
+                                // Remove from this playlist (only for custom playlists, not Favorites/system)
+                                if let playlist = playlist, !playlist.isSystem && !isFavorites {
+                                    Button(role: .destructive) {
+                                        libraryManager.removeTrackFromPlaylist(track, playlist: playlist)
+                                    } label: {
+                                        Label("Remove from Playlist", systemImage: "minus.circle")
+                                    }
+                                }
+                                
+                                // Remove from Favorites
+                                if isFavorites {
+                                    Button(role: .destructive) {
+                                        libraryManager.toggleFavorite(track)
+                                    } label: {
+                                        Label("Remove from Favorites", systemImage: "heart.slash")
+                                    }
+                                }
+                                
+                                Divider()
+                                Button("Add to Queue") { playbackManager.addToQueue(track) }
+                            }
                     }
                 }
                 .padding(.horizontal, 24)
@@ -212,13 +241,20 @@ struct PlaylistDetailView: View {
         }
         .background(SangeetTheme.background.ignoresSafeArea())
         .onAppear { loadTracks() }
-        .onChange(of: libraryManager.favorites) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .playlistUpdated)) { notification in
+            // Refresh if this playlist was updated
+            if let updatedPlaylistId = notification.object as? String,
+               updatedPlaylistId == playlist?.id {
+                loadTracks()
+            }
+        }
+        .onChange(of: libraryManager.favorites) { _, _ in
             if isFavorites { loadTracks() }
         }
-        .onChange(of: libraryManager.recentlyAddedSongs) { _ in
+        .onChange(of: libraryManager.recentlyAddedSongs) { _, _ in
             if playlist?.id == "recentlyAdded" { loadTracks() }
         }
-        .onChange(of: libraryManager.recentlyPlayedSongs) { _ in
+        .onChange(of: libraryManager.recentlyPlayedSongs) { _, _ in
             if playlist?.id == "recentlyPlayed" { loadTracks() }
         }
     }

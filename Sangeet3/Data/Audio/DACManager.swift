@@ -449,11 +449,13 @@ class DACManager: ObservableObject {
             mElement: kAudioObjectPropertyElementMain
         )
         
-        var name: CFString = "" as CFString
-        var size = UInt32(MemoryLayout<CFString>.size)
+        var name: CFString? = nil
+        var size = UInt32(MemoryLayout<CFString?>.size)
         
-        let status = AudioObjectGetPropertyData(id, &address, 0, nil, &size, &name)
-        return status == noErr ? (name as String) : nil
+        let status = withUnsafeMutablePointer(to: &name) { ptr in
+            AudioObjectGetPropertyData(id, &address, 0, nil, &size, ptr)
+        }
+        return status == noErr ? (name as String?) : nil
     }
     
     private func getDeviceUIDForID(_ id: AudioDeviceID) -> String? {
@@ -463,11 +465,13 @@ class DACManager: ObservableObject {
             mElement: kAudioObjectPropertyElementMain
         )
         
-        var uid: CFString = "" as CFString
-        var size = UInt32(MemoryLayout<CFString>.size)
+        var uid: CFString? = nil
+        var size = UInt32(MemoryLayout<CFString?>.size)
         
-        let status = AudioObjectGetPropertyData(id, &address, 0, nil, &size, &uid)
-        return status == noErr ? (uid as String) : nil
+        let status = withUnsafeMutablePointer(to: &uid) { ptr in
+            AudioObjectGetPropertyData(id, &address, 0, nil, &size, ptr)
+        }
+        return status == noErr ? (uid as String?) : nil
     }
 }
 

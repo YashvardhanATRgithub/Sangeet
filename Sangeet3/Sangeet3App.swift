@@ -95,6 +95,10 @@ class AppState: ObservableObject {
         }
     }
     func changeTab(to tab: Tab) {
+        // Reset all navigation paths when switching tabs
+        homeNavigationPath.removeAll()
+        playlistNavigationPath.removeAll()
+        libraryNavigationPath.removeAll()
         currentTab = tab
     }
     

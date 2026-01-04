@@ -148,12 +148,24 @@ struct UniversalSongRow: View {
             }
             
             Menu("Add to Playlist") {
-                ForEach(libraryManager.playlists) { playlist in
-                    Button(playlist.name) {
-                        libraryManager.addTrackToPlaylist(track, playlist: playlist)
+                if libraryManager.playlists.isEmpty {
+                    Button("No playlists - Create one first") { }
+                        .disabled(true)
+                } else {
+                    ForEach(libraryManager.playlists, id: \.id) { playlist in
+                        Button(playlist.name) {
+                            libraryManager.addTrackToPlaylist(track, playlist: playlist)
+                        }
                     }
                 }
+                
+                Divider()
+                
+                Button("Create New Playlist...") {
+                    NotificationCenter.default.post(name: .createPlaylistRequested, object: track)
+                }
             }
+            
             Divider()
             Button("Add to Queue") { playbackManager.addToQueue(track) }
         }

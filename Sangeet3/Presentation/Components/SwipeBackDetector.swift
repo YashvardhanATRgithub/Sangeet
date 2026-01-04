@@ -36,7 +36,7 @@ class SwipeBackDetectorView: NSView {
             self.monitor = nil
         }
         
-        guard let window = self.window else { return }
+        guard self.window != nil else { return }
         
         monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
             self?.handleScroll(event)

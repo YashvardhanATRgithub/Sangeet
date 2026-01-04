@@ -18,9 +18,10 @@ struct TopTabBar: View {
             HStack(spacing: 8) {
 
                 
-                Image(systemName: "waveform.circle.fill")
-                    .font(.title2)
-                    .foregroundStyle(SangeetTheme.primaryGradient)
+                Image("SangeetLogo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 32, height: 32)
                 Text("Sangeet")
                     .font(.title2.bold())
                     .foregroundStyle(.white)
@@ -31,7 +32,7 @@ struct TopTabBar: View {
             
             HStack(spacing: 4) {
                 ForEach(AppState.Tab.allCases, id: \.self) { tab in
-                    Button(action: { withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { selectedTab = tab } }) {
+                    Button(action: { withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { appState.changeTab(to: tab) } }) {
                         HStack(spacing: 6) {
                             Image(systemName: tab.icon).font(.subheadline)
                             Text(tab.rawValue).font(.subheadline.weight(.medium))

@@ -91,4 +91,6 @@ final class AudiophileSettings: ObservableObject {
 
 extension Notification.Name {
     static let audioSettingsChanged = Notification.Name("audioSettingsChanged")
+    static let playlistUpdated = Notification.Name("playlistUpdated")
+    static let createPlaylistRequested = Notification.Name("createPlaylistRequested")
 }
