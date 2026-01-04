@@ -28,6 +28,7 @@ struct ContentView: View {
                     case .home: HomeView()
                     case .library: LibraryView()
                     case .playlists: PlaylistsView()
+                    case .online: OnlineView()
                     case .settings: SettingsView()
                     }
                 }
@@ -61,6 +62,8 @@ struct ContentView: View {
                     .zIndex(100)
             }
             
+
+            
             // Global Search Overlay
             if showGlobalSearch {
                 GlobalSearchOverlay(isVisible: $showGlobalSearch)
@@ -80,4 +83,4 @@ struct ContentView: View {
 }
 
 
-// End of ContentView
+

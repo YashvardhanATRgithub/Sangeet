@@ -207,6 +207,15 @@ final class MetadataExtractor {
     
     private func findFolderArtwork(for url: URL) -> Data? {
         let folder = url.deletingLastPathComponent()
+        let filename = url.deletingPathExtension().lastPathComponent
+        
+        // Priority 1: Exact sidecar match (e.g. "Song.flac" -> "Song.jpg")
+        let sidecarURL = folder.appendingPathComponent("\(filename).jpg")
+        if let data = try? Data(contentsOf: sidecarURL) {
+            return data
+        }
+        
+        // Priority 2: Standard folder names
         let names = ["cover.jpg", "cover.png", "folder.jpg", "folder.png", 
                      "artwork.jpg", "artwork.png", "front.jpg", "front.png",
                      "Cover.jpg", "Cover.png", "Folder.jpg", "Folder.png"]

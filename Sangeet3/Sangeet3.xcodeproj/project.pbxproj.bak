@@ -5,19 +5,6 @@
 	};
 	objectVersion = 77;
 	objects = {
-		62DE57372F02EF8F00A1D4EB /* XCRemoteSwiftPackageReference "GRDB.swift" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/groue/GRDB.swift.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 6.0.0;
-			};
-		};
-		62DE57382F02EF8F00A1D4EB /* GRDB */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 62DE57372F02EF8F00A1D4EB /* XCRemoteSwiftPackageReference "GRDB.swift" */;
-			productName = GRDB;
-		};
 
 /* Begin PBXBuildFile section */
 		6277341F2F0A8AA30091C40C /* TidalDLService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6277341D2F0A8AA30091C40C /* TidalDLService.swift */; };
@@ -27,7 +14,12 @@
 		62DE57292F02BC4400A1D4EB /* libbass.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 62DE57282F02BC4400A1D4EB /* libbass.dylib */; };
 		62DE572A2F02BC4400A1D4EB /* libbass.dylib in Embed Libraries */ = {isa = PBXBuildFile; fileRef = 62DE57282F02BC4400A1D4EB /* libbass.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		62DE57392F02EF8F00A1D4EB /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 62DE57382F02EF8F00A1D4EB /* GRDB */; };
-		BAA00001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BAA00000 /* Assets.xcassets */; };
+		A00000000000000000000002 /* Sangeet3App.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000001 /* Sangeet3App.swift */; };
+		B00000000000000000000002 /* Data/Audio/PlaybackManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000001 /* Data/Audio/PlaybackManager.swift */; };
+		C00000000000000000000002 /* Data/Library/LibraryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C00000000000000000000001 /* Data/Library/LibraryManager.swift */; };
+		D00000000000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D00000000000000000000001 /* ContentView.swift */; };
+		E00000000000000000000002 /* Data/Database/Records/PlaylistRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00000000000000000000001 /* Data/Database/Records/PlaylistRecord.swift */; };
+		F00000000000000000000002 /* Data/Audio/EQManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000001 /* Data/Audio/EQManager.swift */; };
 		FFB00000 /* Sangeet3App.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00000 /* Sangeet3App.swift */; };
 		FFB00001 /* Data/Lyrics/LyricsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00001 /* Data/Lyrics/LyricsService.swift */; };
 		FFB00002 /* Data/Database/Records/TrackRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00002 /* Data/Database/Records/TrackRecord.swift */; };
@@ -95,7 +87,6 @@
 		62DE57282F02BC4400A1D4EB /* libbass.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libbass.dylib; path = "../../../Downloads/bass24-osx/libbass.dylib"; sourceTree = "<group>"; };
 		A00000000000000000000001 /* Sangeet3App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sangeet3App.swift; sourceTree = "<group>"; };
 		B00000000000000000000001 /* Data/Audio/PlaybackManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data/Audio/PlaybackManager.swift; sourceTree = "<group>"; };
-		BAA00000 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C00000000000000000000001 /* Data/Library/LibraryManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data/Library/LibraryManager.swift; sourceTree = "<group>"; };
 		D00000000000000000000001 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		E00000000000000000000001 /* Data/Database/Records/PlaylistRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data/Database/Records/PlaylistRecord.swift; sourceTree = "<group>"; };
@@ -186,7 +177,6 @@
 			isa = PBXGroup;
 			children = (
 				FFA00000 /* Sangeet3App.swift */,
-				BAA00000 /* Assets.xcassets */,
 			);
 			name = "Recovered References";
 			sourceTree = "<group>";
@@ -336,7 +326,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				BAA00001 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -347,7 +336,13 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A00000000000000000000002 /* Sangeet3App.swift in Sources */,
+				B00000000000000000000002 /* Data/Audio/PlaybackManager.swift in Sources */,
+				C00000000000000000000002 /* Data/Library/LibraryManager.swift in Sources */,
+				D00000000000000000000002 /* ContentView.swift in Sources */,
 				6277341F2F0A8AA30091C40C /* TidalDLService.swift in Sources */,
+				E00000000000000000000002 /* Data/Database/Records/PlaylistRecord.swift in Sources */,
+				F00000000000000000000002 /* Data/Audio/EQManager.swift in Sources */,
 				FFB00000 /* Sangeet3App.swift in Sources */,
 				FFB00001 /* Data/Lyrics/LyricsService.swift in Sources */,
 				FFB00002 /* Data/Database/Records/TrackRecord.swift in Sources */,
@@ -392,7 +387,48 @@
 				FFB00039 /* Presentation/Components/ProgressLine.swift in Sources */,
 				FFB00040 /* Presentation/Components/ArtworkView.swift in Sources */,
 				FFB00041 /* Presentation/Theme/SangeetTheme.swift in Sources */,
+				FFB00001 /* Data/Lyrics/LyricsService.swift in Sources */,
+				FFB00002 /* Data/Database/Records/TrackRecord.swift in Sources */,
+				FFB00003 /* Data/Database/Records/FolderRecord.swift in Sources */,
+				FFB00004 /* Data/Database/Records/EQPresetRecord.swift in Sources */,
+				FFB00005 /* Data/Database/Records/QueueStateRecord.swift in Sources */,
+				FFB00006 /* Data/Database/Records/PlaylistRecord.swift in Sources */,
+				FFB00007 /* Data/Database/DatabaseManager.swift in Sources */,
 				627734262F0A8B0E0091C40C /* DownloadManager.swift in Sources */,
+				FFB00008 /* Data/Library/LibraryManager.swift in Sources */,
+				FFB00009 /* Data/Library/MetadataExtractor.swift in Sources */,
+				FFB00010 /* Data/Library/FolderMonitor.swift in Sources */,
+				FFB00011 /* Data/Audio/EQManager.swift in Sources */,
+				FFB00012 /* Data/Audio/LoudnessNormalizer.swift in Sources */,
+				FFB00013 /* Data/Audio/BASSEngine.swift in Sources */,
+				FFB00014 /* Data/Audio/SystemMediaManager.swift in Sources */,
+				FFB00015 /* Data/Audio/DACManager.swift in Sources */,
+				FFB00016 /* Data/Audio/AudiophileSettings.swift in Sources */,
+				FFB00017 /* Data/Audio/PlaybackManager.swift in Sources */,
+				FFB00018 /* Data/Metadata/SmartMetadataManager.swift in Sources */,
+				FFB00019 /* Domain/Entities/Track.swift in Sources */,
+				FFB00020 /* ContentView.swift in Sources */,
+				FFB00021 /* Presentation/Screens/Settings/SettingsView.swift in Sources */,
+				FFB00022 /* Presentation/Screens/Home/HomeView.swift in Sources */,
+				FFB00023 /* Presentation/Screens/Playlists/PlaylistsView.swift in Sources */,
+				FFB00024 /* Presentation/Screens/Library/LibraryView.swift in Sources */,
+				FFB00025 /* Presentation/Screens/Library/LibraryDetailView.swift in Sources */,
+				FFB00026 /* Presentation/Screens/Player/FullScreenPlayerView.swift in Sources */,
+				FFB00027 /* Presentation/Components/GlobalSearch.swift in Sources */,
+				FFB00028 /* Presentation/Components/CompactAudioOutputPicker.swift in Sources */,
+				FFB00029 /* Presentation/Components/UniversalSongRow.swift in Sources */,
+				FFB00030 /* Presentation/Components/HeartButton.swift in Sources */,
+				FFB00031 /* Presentation/Components/TopTabBar.swift in Sources */,
+				FFB00042 /* Presentation/Components/EqualizerView.swift in Sources */,
+				FFB00033 /* Presentation/Components/SwipeBackDetector.swift in Sources */,
+				FFB00034 /* Presentation/Components/LyricsView.swift in Sources */,
+				FFB00035 /* Presentation/Components/QueueSidebar.swift in Sources */,
+				FFB00036 /* Presentation/Components/FloatingDock.swift in Sources */,
+				FFB00037 /* Presentation/Components/LibraryInspectorView.swift in Sources */,
+				FFB00038 /* Presentation/Components/QueueDropDelegate.swift in Sources */,
+				FFB00039 /* Presentation/Components/ProgressLine.swift in Sources */,
+				FFB00040 /* Presentation/Components/ArtworkView.swift in Sources */,
+				FFB00041 /* Presentation/Theme/SangeetTheme.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -528,9 +564,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_PREVIEWS = YES;
-				ESCAPED_INFOPLIST_FILE = Sangeet3/Info.plist;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = Sangeet3/Info.plist;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -568,9 +603,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_PREVIEWS = YES;
-				ESCAPED_INFOPLIST_FILE = Sangeet3/Info.plist;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = Sangeet3/Info.plist;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",

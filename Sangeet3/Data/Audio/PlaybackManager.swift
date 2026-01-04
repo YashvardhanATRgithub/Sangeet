@@ -116,6 +116,17 @@ final class PlaybackManager: ObservableObject {
         }
     }
     
+    func updateCurrentTrack(_ track: Track) {
+        // Only update if IDs match to prevent race conditions
+        guard currentTrack?.id == track.id else { return }
+        
+        currentTrack = track
+        
+        // Update System Media Info
+        let image = track.artworkData.flatMap { NSImage(data: $0) }
+        SystemMediaManager.shared.updateNowPlaying(track: track, image: image)
+    }
+    
     private func reloadCurrentTrack() {
         guard let track = currentTrack else { return }
         

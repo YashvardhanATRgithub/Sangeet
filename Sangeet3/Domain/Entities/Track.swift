@@ -15,6 +15,7 @@ struct Track: Identifiable, Hashable {
     var duration: TimeInterval
     var fileURL: URL
     var artworkData: Data?
+    var artworkURL: URL? // For remote or lazy loading
     var isFavorite: Bool
     var playCount: Int
     var lastPlayed: Date?
@@ -26,10 +27,21 @@ struct Track: Identifiable, Hashable {
         return String(format: "%d:%02d", minutes, seconds)
     }
     
-    init(id: UUID = UUID(), title: String, artist: String = "Unknown Artist", album: String = "Unknown Album", duration: TimeInterval = 0, fileURL: URL, artworkData: Data? = nil, isFavorite: Bool = false, playCount: Int = 0, lastPlayed: Date? = nil, dateAdded: Date = Date()) {
-        self.id = id; self.title = title; self.artist = artist; self.album = album; self.duration = duration; self.fileURL = fileURL; self.artworkData = artworkData; self.isFavorite = isFavorite; self.playCount = playCount; self.lastPlayed = lastPlayed; self.dateAdded = dateAdded
+    init(id: UUID = UUID(), title: String, artist: String = "Unknown Artist", album: String = "Unknown Album", duration: TimeInterval = 0, fileURL: URL, artworkData: Data? = nil, artworkURL: URL? = nil, isFavorite: Bool = false, playCount: Int = 0, lastPlayed: Date? = nil, dateAdded: Date = Date()) {
+        self.id = id; self.title = title; self.artist = artist; self.album = album; self.duration = duration; self.fileURL = fileURL; self.artworkData = artworkData; self.artworkURL = artworkURL; self.isFavorite = isFavorite; self.playCount = playCount; self.lastPlayed = lastPlayed; self.dateAdded = dateAdded
     }
     
-    func hash(into hasher: inout Hasher) { hasher.combine(id) }
-    static func == (lhs: Track, rhs: Track) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+        // We generally hash ID for set/dict performance, but == determines view updates
+    }
+    
+    static func == (lhs: Track, rhs: Track) -> Bool {
+        return lhs.id == rhs.id &&
+               lhs.artworkURL == rhs.artworkURL &&
+               lhs.artworkData == rhs.artworkData &&
+               lhs.title == rhs.title &&
+               lhs.artist == rhs.artist && 
+               lhs.album == rhs.album
+    }
 }

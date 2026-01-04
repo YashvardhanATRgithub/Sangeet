@@ -283,13 +283,24 @@ final class BASSEngine: ObservableObject {
         self.onTrackEnd = onEnd
         
         // Create stream
-        currentStream = BASS_StreamCreateFile(
-            BOOL32(truncating: false),
-            url.path,
-            0,
-            0,
-            DWORD(BASS_STREAM_PRESCAN) | DWORD(BASS_SAMPLE_FLOAT)
-        )
+        // Create stream
+        if url.isFileURL {
+            currentStream = BASS_StreamCreateFile(
+                BOOL32(truncating: false),
+                url.path,
+                0,
+                0,
+                DWORD(BASS_STREAM_PRESCAN) | DWORD(BASS_SAMPLE_FLOAT)
+            )
+        } else {
+            currentStream = BASS_StreamCreateURL(
+                url.absoluteString,
+                0,
+                DWORD(BASS_STREAM_PRESCAN) | DWORD(BASS_SAMPLE_FLOAT),
+                nil,
+                nil
+            )
+        }
         
         if currentStream == 0 {
              throw NSError(domain: "BASSEngine", code: Int(BASS_ErrorGetCode()), userInfo: nil)
@@ -336,13 +347,28 @@ final class BASSEngine: ObservableObject {
         }
         
         // Create stream
-        let stream = BASS_StreamCreateFile(
-            BOOL32(truncating: false),
-            url.path,
-            0,
-            0,
-            flags
-        )
+        let stream: HSTREAM
+        
+        if url.isFileURL {
+            stream = BASS_StreamCreateFile(
+                BOOL32(truncating: false),
+                url.path,
+                0,
+                0,
+                flags
+            )
+        } else {
+            // Remote URL
+            // Ensure flags don't include PRESCAN if it causes issues, but for now keep consistent
+            // BASS_StreamCreateURL takes (url, offset, flags, proc, user)
+            stream = BASS_StreamCreateURL(
+                url.absoluteString,
+                0,
+                flags,
+                nil,
+                nil
+            )
+        }
         
         return stream
     }

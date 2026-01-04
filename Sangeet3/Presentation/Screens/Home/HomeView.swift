@@ -73,6 +73,48 @@ struct HomeView: View {
     
     @ViewBuilder
     private var homeSections: some View {
+        // Recently Played (History)
+        if !libraryManager.recentlyPlayedSongs.isEmpty {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Recently Played")
+                    .font(.title2.bold())
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 24)
+                
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 16) {
+                        ForEach(libraryManager.recentlyPlayedSongs) { track in
+                            SongCard(track: track) {
+                                playbackManager.play(track)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 24)
+                }
+            }
+        }
+        
+        // Recently Added
+        if !libraryManager.recentlyAddedSongs.isEmpty {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Recently Added")
+                    .font(.title2.bold())
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 24)
+                
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 16) {
+                        ForEach(libraryManager.recentlyAddedSongs) { track in
+                            SongCard(track: track) {
+                                playbackManager.play(track)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 24)
+                }
+            }
+        }
+        
         // Most Listened Section (Replaces All Songs)
         if !libraryManager.mostListenedSongs.isEmpty {
             VStack(alignment: .leading, spacing: 16) {
@@ -87,49 +129,6 @@ struct HomeView: View {
                             SongCard(track: track) {
                                 playbackManager.playQueue(tracks: libraryManager.mostListenedSongs, startIndex: index)
                             }
-                        }
-                    }
-                    .padding(.horizontal, 24)
-                }
-            }
-        }
-        
-        // Trending Section
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Trending Now")
-                .font(.title2.bold())
-                .foregroundStyle(.white)
-                .padding(.horizontal, 24)
-            
-            if libraryManager.isLoadingTopSongs {
-                ProgressView()
-                    .padding(.leading, 24)
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 16) {
-                        ForEach(libraryManager.topSongs) { song in
-                            TrendingSongCard(song: song)
-                        }
-                    }
-                    .padding(.horizontal, 24)
-                }
-            }
-            
-            Text("Trending in India")
-                .font(.title2.bold())
-                .foregroundStyle(.white)
-                .padding(.horizontal, 24)
-                .padding(.top, 16)
-            
-            if libraryManager.trendingIndiaSongs.isEmpty {
-                ProgressView()
-                    .padding(.leading, 24)
-                    .onAppear { Task { await libraryManager.fetchTrendingIndia() } }
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 16) {
-                        ForEach(libraryManager.trendingIndiaSongs) { song in
-                            TrendingSongCard(song: song)
                         }
                     }
                     .padding(.horizontal, 24)

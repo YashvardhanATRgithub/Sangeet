@@ -35,6 +35,12 @@ struct ArtworkView: View {
                     Image(nsImage: artwork)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
+                } else if let url = track?.artworkURL {
+                    AsyncImage(url: url) { image in
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        placeholderView
+                    }
                 } else {
                     placeholderView
                 }
@@ -46,7 +52,7 @@ struct ArtworkView: View {
                     .stroke(Color.white.opacity(0.1), lineWidth: 1)
             )
         }
-        .onChange(of: track?.id) { _, _ in
+        .onChange(of: track) { _, _ in
             loadArtwork()
         }
         .onAppear {
@@ -114,6 +120,9 @@ class ArtworkLoader: ObservableObject {
     @Published var artwork: NSImage?
     
     func load(for track: Track) async {
+        // Reset state immediately to prevent stale artwork from showing
+        self.artwork = nil
+        
         // Check cache first
         if let cached = await ArtworkCache.shared.get(track.id) {
             self.artwork = cached

@@ -121,6 +121,22 @@ final class LibraryManager: ObservableObject {
         }
     }
     
+    // Expose programmatic add folder
+    func addFolder(url: URL) async {
+        if !folders.contains(url) {
+            await addFolderToDatabase(url)
+            
+            await MainActor.run {
+                if !self.folders.contains(url) {
+                     self.folders.append(url)
+                }
+            }
+            
+            startMonitoring(folder: url)
+            await scanFolder(url)
+        }
+    }
+    
     private func addFolderToDatabase(_ url: URL) async {
         do {
             let bookmarkData = try url.bookmarkData(
@@ -221,21 +237,38 @@ final class LibraryManager: ObservableObject {
         
         // 2. Scan File System
         let fileManager = FileManager.default
+        print("[LibraryManager] enumerating: \(url.path)")
+        
         guard let enumerator = fileManager.enumerator(
             at: url,
             includingPropertiesForKeys: [.isRegularFileKey, .creationDateKey],
             options: [.skipsHiddenFiles]
         ) else {
+            print("[LibraryManager] Failed to create enumerator for \(url.path)")
             return
         }
         
-        let allFiles = enumerator.allObjects as? [URL] ?? []
+        // Manual iteration to debug
+        var allFiles: [URL] = []
+        for case let fileURL as URL in enumerator {
+            allFiles.append(fileURL)
+        }
+        
+        print("[LibraryManager] Scanning \(url.path): Found \(allFiles.count) files")
+        if allFiles.isEmpty {
+             // Fallback check
+             let contents = try? fileManager.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)
+             print("[LibraryManager] Fallback check: contentsOfDirectory found \(contents?.count ?? 0) items")
+        }
         
         var newTracks: [Track] = []
         var foundPaths: Set<String> = []
         
         for fileURL in allFiles {
             let ext = fileURL.pathExtension.lowercased()
+            // Debug print for first few files
+            if foundPaths.count < 3 { print("[LibraryManager] Checking: \(fileURL.lastPathComponent) (\(ext))") }
+            
             guard supportedExtensions.contains(ext) else { continue }
             
             let path = fileURL.path
@@ -250,6 +283,7 @@ final class LibraryManager: ObservableObject {
             // It's a new track
             let track = createTrackFast(from: fileURL)
             newTracks.append(track)
+            print("[LibraryManager] Created new track: \(track.title)")
         }
         
         // 3. Process Deletions (Pruning)
@@ -494,6 +528,7 @@ final class LibraryManager: ObservableObject {
                 // Notify UI to refresh
                 await MainActor.run {
                     NotificationCenter.default.post(name: .playlistUpdated, object: playlist.id)
+                    self.objectWillChange.send() // Force UI update for track counts
                 }
             } catch {
                 print("[LibraryManager] Add to playlist error: \(error)")
@@ -515,6 +550,7 @@ final class LibraryManager: ObservableObject {
                 // Notify UI to refresh
                 await MainActor.run {
                     NotificationCenter.default.post(name: .playlistUpdated, object: playlist.id)
+                    self.objectWillChange.send() // Force UI update for track counts
                 }
             } catch {
                 print("[LibraryManager] Remove from playlist error: \(error)")
