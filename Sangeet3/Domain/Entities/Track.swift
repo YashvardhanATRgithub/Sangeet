@@ -27,6 +27,12 @@ struct Track: Identifiable, Hashable {
         return String(format: "%d:%02d", minutes, seconds)
     }
     
+    /// Returns true if this track is from a remote streaming URL (not a local file)
+    var isRemote: Bool {
+        let scheme = fileURL.scheme?.lowercased() ?? ""
+        return scheme == "http" || scheme == "https"
+    }
+    
     init(id: UUID = UUID(), title: String, artist: String = "Unknown Artist", album: String = "Unknown Album", duration: TimeInterval = 0, fileURL: URL, artworkData: Data? = nil, artworkURL: URL? = nil, isFavorite: Bool = false, playCount: Int = 0, lastPlayed: Date? = nil, dateAdded: Date = Date()) {
         self.id = id; self.title = title; self.artist = artist; self.album = album; self.duration = duration; self.fileURL = fileURL; self.artworkData = artworkData; self.artworkURL = artworkURL; self.isFavorite = isFavorite; self.playCount = playCount; self.lastPlayed = lastPlayed; self.dateAdded = dateAdded
     }

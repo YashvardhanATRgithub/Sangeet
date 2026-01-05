@@ -27,11 +27,16 @@ struct UniversalSongRow: View {
         selectedTrack?.id == track.id
     }
     
-    var dateFormatter: DateFormatter {
-        let fmt = DateFormatter()
-        fmt.dateStyle = .medium
-        fmt.timeStyle = .none
-        return fmt
+    /// Get file size as formatted string
+    var fileSize: String {
+        guard !track.isRemote else { return "Stream" }
+        do {
+            let resources = try track.fileURL.resourceValues(forKeys: [.fileSizeKey])
+            if let size = resources.fileSize {
+                return ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file)
+            }
+        } catch {}
+        return "--"
     }
     
     var body: some View {
@@ -83,13 +88,13 @@ struct UniversalSongRow: View {
                 .padding(.vertical, 4)
                 .background(SangeetTheme.surfaceElevated)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
-                .frame(width: 80, alignment: .trailing)
+                .frame(width: 60, alignment: .center)
             
-            // Date Added
-            Text(dateFormatter.string(from: track.dateAdded))
+            // File Size
+            Text(fileSize)
                 .font(.caption)
                 .foregroundStyle(SangeetTheme.textSecondary)
-                .frame(width: 100, alignment: .trailing)
+                .frame(width: 70, alignment: .trailing)
             
             // Liked Status (Using reactive isFavorite)
             ZStack {
@@ -168,6 +173,13 @@ struct UniversalSongRow: View {
             
             Divider()
             Button("Add to Queue") { playbackManager.addToQueue(track) }
+            
+            Divider()
+            Button(role: .destructive) {
+                libraryManager.deleteTrack(track)
+            } label: {
+                Label("Delete Song", systemImage: "trash")
+            }
         }
     }
 }

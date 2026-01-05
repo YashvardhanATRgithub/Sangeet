@@ -11,13 +11,15 @@ struct ContentView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var playbackManager: PlaybackManager
     @EnvironmentObject var libraryManager: LibraryManager
+    @ObservedObject var themeManager = ThemeManager.shared // Observe for instant color updates
     @State private var showFullScreenPlayer = false
     @State private var showQueueSidebar = false
     @State private var showGlobalSearch = false
     
     var body: some View {
         ZStack {
-            SangeetTheme.background.ignoresSafeArea()
+            // Use themeManager directly for instant updates
+            themeManager.background.ignoresSafeArea()
             
             // Main Content Area
             VStack(spacing: 0) {
@@ -44,9 +46,19 @@ struct ContentView: View {
             }
             // Add a padding to the bottom of the content to allow scrolling behind the dock is handled in individual views
             
-            // Queue Sidebar Overlay
+            // Queue Sidebar Overlay with click-outside-to-close
             // Placed in ZStack to float over content instead of shifting it
             if showQueueSidebar {
+                // Dimmed background to click to close
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            showQueueSidebar = false
+                        }
+                    }
+                    .zIndex(45)
+                
                 HStack {
                     Spacer()
                     QueueSidebar(isVisible: $showQueueSidebar)

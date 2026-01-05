@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ProgressLine: View {
     @EnvironmentObject var playbackManager: PlaybackManager
+    @EnvironmentObject var themeManager: ThemeManager
     @State private var isDragging = false
     @State private var dragProgress: Double = 0
     
@@ -24,9 +25,8 @@ struct ProgressLine: View {
             
             ZStack(alignment: .leading) {
                 Rectangle().fill(Color.white.opacity(0.1)).frame(height: 2)
-                Rectangle().fill(SangeetTheme.accentGradient).frame(width: progressX, height: 3)
+                Rectangle().fill(themeManager.accentGradient).frame(width: progressX, height: 3)
                 RoundedRectangle(cornerRadius: 3).fill(.white).frame(width: 6, height: isDragging ? 18 : 14)
-                    .shadow(color: SangeetTheme.glowShadow, radius: 6)
                     .position(x: max(3, min(width - 3, progressX)), y: geo.size.height / 2)
                     .animation(.spring(response: 0.2), value: isDragging)
             }

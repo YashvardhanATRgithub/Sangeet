@@ -89,8 +89,8 @@ class DownloadManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
     @MainActor
     private func startDownload(track: TidalTrack, to directory: URL) async {
         do {
-            // 1. Get Stream URL
-            guard let streamURL = try await tidalService.getStreamURL(trackID: track.id) else {
+            // 1. Get Stream URL (Use LOSSLESS - HI_RES returns DASH manifest requiring segment assembly)
+            guard let streamURL = try await tidalService.getStreamURL(trackID: track.id, quality: .LOSSLESS) else {
                 throw NSError(domain: "TidalDL", code: 404, userInfo: [NSLocalizedDescriptionKey: "Stream URL not found"])
             }
             
@@ -98,7 +98,7 @@ class DownloadManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
             let safeArtistName = track.artist?.name ?? "Unknown Artist"
             let safeAlbumName = track.album.title
             
-            let fileName = "\(safeArtistName) - \(track.title).m4a"
+            let fileName = "\(safeArtistName) - \(track.title).flac"
                 .replacingOccurrences(of: "/", with: "-") // Sanitize
             let destinationURL = directory.appendingPathComponent(fileName)
             
@@ -169,7 +169,7 @@ class DownloadManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
                     FileManager.default.urls(for: .musicDirectory, in: .userDomainMask).first?.appendingPathComponent("Sangeet Downloads") {
                      
                      let safeArtistName = task.track.artist?.name ?? "Unknown Artist"
-                     let fileName = "\(safeArtistName) - \(task.track.title).m4a"
+                     let fileName = "\(safeArtistName) - \(task.track.title).flac"
                          .replacingOccurrences(of: "/", with: "-")
                      let destinationURL = targetDir.appendingPathComponent(fileName)
                      
@@ -203,7 +203,7 @@ class DownloadManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
                     FileManager.default.urls(for: .musicDirectory, in: .userDomainMask).first?.appendingPathComponent("Sangeet Downloads") {
                      
                      let safeArtistName = task.track.artist?.name ?? "Unknown Artist"
-                     let fileName = "\(safeArtistName) - \(task.track.title).m4a"
+                     let fileName = "\(safeArtistName) - \(task.track.title).flac"
                          .replacingOccurrences(of: "/", with: "-")
                      let destinationURL = targetDir.appendingPathComponent(fileName)
                      

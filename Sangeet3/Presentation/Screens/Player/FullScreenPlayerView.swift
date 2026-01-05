@@ -53,7 +53,7 @@ struct FullScreenPlayerView: View {
                         ArtworkView(track: playbackManager.currentTrack, size: 300, cornerRadius: 24, showGlow: true)
                         
                         // Track info
-                        HStack(alignment: .center, spacing: 0) {
+                        VStack(spacing: 12) {
                             VStack(spacing: 8) {
                                 Text(playbackManager.currentTrack?.title ?? "Not Playing")
                                     .font(.title.bold())
@@ -66,9 +66,16 @@ struct FullScreenPlayerView: View {
                                     .foregroundStyle(SangeetTheme.textSecondary)
                             }
                             
+                            // Heart and Download buttons below metadata
                             if let track = playbackManager.currentTrack {
-                                HeartButton(track: track, size: 24, color: .white.opacity(0.6))
-                                    .padding(.leading, 12)
+                                HStack(spacing: 16) {
+                                    HeartButton(track: track, size: 24, color: .white.opacity(0.6))
+                                    
+                                    // Show download button for remote tracks
+                                    if track.isRemote {
+                                        DownloadButton(track: track, size: 24)
+                                    }
+                                }
                             }
                         }
                         .frame(maxWidth: 300)
@@ -128,7 +135,6 @@ struct FullScreenPlayerView: View {
                                 Circle()
                                     .fill(SangeetTheme.primaryGradient)
                                     .frame(width: 80, height: 80)
-                                    .shadow(color: SangeetTheme.glowShadow, radius: 24)
                                 
                                 Image(systemName: playbackManager.isPlaying ? "pause.fill" : "play.fill")
                                     .font(.title.bold())

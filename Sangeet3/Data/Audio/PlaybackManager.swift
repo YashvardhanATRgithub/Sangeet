@@ -344,10 +344,53 @@ final class PlaybackManager: ObservableObject {
         
         queueIndex += 1
         
-        // Infinite Queue Logic
+        // Infinite Queue Logic - Add more songs BEFORE checking queue end
         if queueIndex >= queue.count && isInfiniteQueueEnabled {
             print("[PlaybackManager] Infinite Queue: Queue ended, appending similar songs...")
-            autoplaySimilarSongs()
+            // Synchronously add songs to prevent queue from being empty
+            let library = LibraryManager.shared.tracks
+            guard !library.isEmpty else {
+                // Fall through to regular queue end logic
+                if repeatMode == .all {
+                    queueIndex = 0
+                } else {
+                    queueIndex = queue.count - 1
+                    isPlaying = false
+                    player.pause()
+                    stopPositionTimer()
+                    print("[PlaybackManager] End of queue reached (infinite mode, but library empty)")
+                    return
+                }
+                if let nextTrack = queue[safe: queueIndex] {
+                    play(nextTrack)
+                }
+                return
+            }
+            
+            // Exclude current queue to ensure variety
+            let currentIDs = Set(queue.map { $0.id })
+            let candidates = library.filter { !currentIDs.contains($0.id) }
+            let pool = candidates.isEmpty ? library : candidates
+            let selection = Array(pool.shuffled().prefix(5))
+            
+            if !selection.isEmpty {
+                // Add to queue WITHOUT filtering duplicates since we already filtered
+                queue.append(contentsOf: selection)
+                print("[PlaybackManager] Infinite Queue: Added \(selection.count) songs")
+                
+                // Now queueIndex should be valid
+                if let nextTrack = queue[safe: queueIndex] {
+                    print("[PlaybackManager] Next track (infinite): \(nextTrack.title) (Index: \(queueIndex))")
+                    if manualSkip && crossfadeEnabled {
+                        crossfadeToTrack(nextTrack)
+                    } else if seamlessPlaybackEnabled {
+                        gaplessToNextTrack(nextTrack)
+                    } else {
+                        play(nextTrack)
+                    }
+                    return
+                }
+            }
         }
         
         if queueIndex >= queue.count {

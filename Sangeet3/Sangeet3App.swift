@@ -13,6 +13,7 @@ struct Sangeet3App: App {
     @StateObject private var appState = AppState()
     @StateObject private var playbackManager = PlaybackManager.shared
     @StateObject private var libraryManager = LibraryManager.shared
+    @StateObject private var themeManager = ThemeManager.shared
     
     var body: some Scene {
         WindowGroup("Sangeet") {
@@ -20,6 +21,7 @@ struct Sangeet3App: App {
                 .environmentObject(appState)
                 .environmentObject(playbackManager)
                 .environmentObject(libraryManager)
+                .environmentObject(themeManager)
                 .preferredColorScheme(.dark)
         }
         .windowStyle(.hiddenTitleBar)

@@ -454,6 +454,50 @@ final class LibraryManager: ObservableObject {
         }
     }
     
+    /// Delete a track from disk, database, and memory
+    func deleteTrack(_ track: Track) {
+        // 1. Remove from memory immediately for instant UI feedback
+        tracks.removeAll { $0.id == track.id }
+        rebuildIndexes()
+        
+        // 2. Delete from database
+        DatabaseManager.shared.writeAsync { db in
+            try TrackRecord
+                .filter(Column("id") == track.id.uuidString)
+                .deleteAll(db)
+            
+            // Also remove from any playlists
+            try PlaylistTrackRecord
+                .filter(Column("trackId") == track.id.uuidString)
+                .deleteAll(db)
+        }
+        
+        // 3. Delete file from disk (only for local files)
+        if !track.isRemote {
+            let fileURL = track.fileURL
+            let accessing = fileURL.startAccessingSecurityScopedResource()
+            defer { if accessing { fileURL.stopAccessingSecurityScopedResource() } }
+            
+            do {
+                try FileManager.default.removeItem(at: fileURL)
+                print("[LibraryManager] Deleted file: \(fileURL.lastPathComponent)")
+                
+                // Also delete any sidecar files (artwork, metadata)
+                let basePath = fileURL.deletingPathExtension()
+                let sidecarExtensions = ["jpg", "png", "json"]
+                for ext in sidecarExtensions {
+                    let sidecarURL = basePath.appendingPathExtension(ext)
+                    try? FileManager.default.removeItem(at: sidecarURL)
+                }
+            } catch {
+                print("[LibraryManager] Delete file error: \(error)")
+            }
+        }
+        
+        // 4. Notify UI
+        objectWillChange.send()
+    }
+    
     // MARK: - Favorites
     
     var favorites: [Track] {

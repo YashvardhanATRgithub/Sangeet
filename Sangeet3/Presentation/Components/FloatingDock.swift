@@ -11,6 +11,7 @@ import SwiftUI
 
 struct FloatingDock: View {
     @EnvironmentObject var playbackManager: PlaybackManager
+    @EnvironmentObject var themeManager: ThemeManager
     @Binding var showFullScreen: Bool
     @Binding var showQueue: Bool
     
@@ -121,6 +122,11 @@ struct TrackInfoView: View {
             
             if let track = playbackManager.currentTrack {
                 HeartButton(track: track, size: 16, color: SangeetTheme.textSecondary)
+                
+                // Show download button for remote tracks
+                if track.isRemote {
+                    DownloadButton(track: track, size: 16, color: SangeetTheme.textSecondary)
+                }
             }
         }
     }
@@ -150,7 +156,6 @@ struct PlaybackControlsView: View {
                     Circle()
                         .fill(SangeetTheme.primaryGradient)
                         .frame(width: 44, height: 44)
-                        .shadow(color: SangeetTheme.glowShadow, radius: 16)
                     
                     Image(systemName: playbackManager.isPlaying ? "pause.fill" : "play.fill")
                         .font(.title3.weight(.bold))
@@ -290,6 +295,7 @@ struct ControlButton: View {
 // MARK: - Android-Style Squiggly Progress Bar
 struct SquigglyProgressBar: View {
     @EnvironmentObject var playbackManager: PlaybackManager
+    @EnvironmentObject var themeManager: ThemeManager
     
     @State private var isDragging: Bool = false
     @State private var dragProgress: Double = 0.0
@@ -342,7 +348,7 @@ struct SquigglyProgressBar: View {
                             ctx.stroke(
                                 path,
                                 with: .linearGradient(
-                                    Gradient(colors: [SangeetTheme.secondary, SangeetTheme.accent]),
+                                    Gradient(colors: [themeManager.secondary, themeManager.accent]),
                                     startPoint: CGPoint(x: 0, y: centerY),
                                     endPoint: CGPoint(x: endX, y: centerY)
                                 ),

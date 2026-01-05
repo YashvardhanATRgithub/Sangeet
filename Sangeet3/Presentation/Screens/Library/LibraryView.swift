@@ -67,14 +67,14 @@ struct LibraryView: View {
                 EmptyLibraryView()
             } else {
                 ScrollView {
-                    // Header Row
-                    HStack(spacing: 16) {
+                    // Header Row - widths must match UniversalSongRow
+                    HStack(spacing: 20) {
                         Text("Title").frame(maxWidth: .infinity, alignment: .leading)
                         Text("Duration").frame(width: 80, alignment: .trailing)
-                        Text("Format").frame(width: 80, alignment: .trailing)
-                        Text("Date Added").frame(width: 100, alignment: .trailing)
-                        // Button spacing
-                        Color.clear.frame(width: 20)
+                        Text("Format").frame(width: 60, alignment: .center)
+                        Text("Size").frame(width: 70, alignment: .trailing)
+                        // Heart button spacing
+                        Color.clear.frame(width: 30)
                     }
                     .font(.caption.bold())
                     .foregroundStyle(SangeetTheme.textSecondary)

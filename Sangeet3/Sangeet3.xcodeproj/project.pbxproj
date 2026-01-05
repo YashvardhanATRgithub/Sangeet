@@ -70,6 +70,8 @@
 		FFB00040 /* Presentation/Components/ArtworkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00040 /* Presentation/Components/ArtworkView.swift */; };
 		FFB00041 /* Presentation/Theme/SangeetTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00041 /* Presentation/Theme/SangeetTheme.swift */; };
 		FFB00042 /* Presentation/Components/EqualizerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00042 /* Presentation/Components/EqualizerView.swift */; };
+		FFB00043 /* Presentation/Components/DownloadButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00043 /* Presentation/Components/DownloadButton.swift */; };
+		FFB00044 /* Presentation/Theme/ThemeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00044 /* Presentation/Theme/ThemeManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -142,6 +144,8 @@
 		FFA00040 /* Presentation/Components/ArtworkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Components/ArtworkView.swift; sourceTree = "<group>"; };
 		FFA00041 /* Presentation/Theme/SangeetTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Theme/SangeetTheme.swift; sourceTree = "<group>"; };
 		FFA00042 /* Presentation/Components/EqualizerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Components/EqualizerView.swift; sourceTree = "<group>"; };
+		FFA00043 /* Presentation/Components/DownloadButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Components/DownloadButton.swift; sourceTree = "<group>"; };
+		FFA00044 /* Presentation/Theme/ThemeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Theme/ThemeManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -239,6 +243,8 @@
 				FFA00039 /* Presentation/Components/ProgressLine.swift */,
 				FFA00040 /* Presentation/Components/ArtworkView.swift */,
 				FFA00041 /* Presentation/Theme/SangeetTheme.swift */,
+				FFA00044 /* Presentation/Theme/ThemeManager.swift */,
+				FFA00043 /* Presentation/Components/DownloadButton.swift */,
 				B00000000000000000000001 /* Data/Audio/PlaybackManager.swift */,
 				C00000000000000000000001 /* Data/Library/LibraryManager.swift */,
 				D00000000000000000000001 /* ContentView.swift */,
@@ -392,6 +398,8 @@
 				FFB00039 /* Presentation/Components/ProgressLine.swift in Sources */,
 				FFB00040 /* Presentation/Components/ArtworkView.swift in Sources */,
 				FFB00041 /* Presentation/Theme/SangeetTheme.swift in Sources */,
+				FFB00043 /* Presentation/Components/DownloadButton.swift in Sources */,
+				FFB00044 /* Presentation/Theme/ThemeManager.swift in Sources */,
 				627734262F0A8B0E0091C40C /* DownloadManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

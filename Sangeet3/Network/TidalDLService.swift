@@ -148,15 +148,44 @@ actor TidalDLService {
             // 2. Parsed Manifest Logic
             if let manifestBase64 = wrapper.data.manifest {
                 // Decode Base64
-                if let decodedData = Data(base64Encoded: manifestBase64),
-                   let json = try? JSONSerialization.jsonObject(with: decodedData) as? [String: Any],
+                guard let decodedData = Data(base64Encoded: manifestBase64) else {
+                    print("[TidalService] Failed to decode manifest base64")
+                    return nil
+                }
+                
+                // Check if it's JSON (lower quality formats)
+                if let json = try? JSONSerialization.jsonObject(with: decodedData) as? [String: Any],
                    let urls = json["urls"] as? [String],
                    let firstUrl = urls.first {
-                    
-                    print("[TidalService] Extracted URL from Manifest: \(firstUrl)")
+                    print("[TidalService] Extracted URL from JSON Manifest: \(firstUrl)")
                     return URL(string: firstUrl)
-                } 
-                print("[TidalService] Failed to parse manifest JSON or find URLs.")
+                }
+                
+                // Check if it's DASH XML (HI_RES format)
+                if let xmlString = String(data: decodedData, encoding: .utf8) {
+                    print("[TidalService] Manifest is DASH XML format")
+                    
+                    // Extract initialization URL from SegmentTemplate
+                    // Pattern: initialization="https://..."
+                    if let initRange = xmlString.range(of: "initialization=\""),
+                       let endQuote = xmlString[initRange.upperBound...].range(of: "\"") {
+                        let urlString = String(xmlString[initRange.upperBound..<endQuote.lowerBound])
+                        print("[TidalService] Extracted init URL from DASH: \(urlString.prefix(100))...")
+                        return URL(string: urlString)
+                    }
+                    
+                    // Alternative: Try to find any https URL in the manifest
+                    let pattern = "https://[^\"\\s<>]+"
+                    if let regex = try? NSRegularExpression(pattern: pattern),
+                       let match = regex.firstMatch(in: xmlString, range: NSRange(xmlString.startIndex..., in: xmlString)),
+                       let range = Range(match.range, in: xmlString) {
+                        let urlString = String(xmlString[range])
+                        print("[TidalService] Extracted URL via regex: \(urlString.prefix(100))...")
+                        return URL(string: urlString)
+                    }
+                }
+                
+                print("[TidalService] Failed to parse manifest")
                 return nil
             }
             

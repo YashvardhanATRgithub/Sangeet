@@ -8,19 +8,23 @@
 import SwiftUI
 
 enum SangeetTheme {
-    static let background = Color(hex: "0D0D0D")
-    static let surface = Color(hex: "1A1A2E")
-    static let surfaceElevated = Color(hex: "242438")
-    static let primary = Color(hex: "7B2CBF")
-    static let secondary = Color(hex: "9D4EDD")
-    static let accent = Color(hex: "E040FB")
+    // Dynamic background colors from ThemeManager
+    static var background: Color { ThemeManager.shared.background }
+    static var surface: Color { ThemeManager.shared.surface }
+    static var surfaceElevated: Color { ThemeManager.shared.surfaceElevated }
+    
+    // Dynamic colors from ThemeManager
+    static var primary: Color { ThemeManager.shared.primary }
+    static var secondary: Color { ThemeManager.shared.secondary }
+    static var accent: Color { ThemeManager.shared.accent }
+    
     static let textPrimary = Color.white
     static let textSecondary = Color(hex: "B0B0B0")
     static let textMuted = Color(hex: "666666")
     
-    static let primaryGradient = LinearGradient(colors: [primary, secondary], startPoint: .topLeading, endPoint: .bottomTrailing)
-    static let accentGradient = LinearGradient(colors: [secondary, accent], startPoint: .leading, endPoint: .trailing)
-    static let glowShadow = Color.purple.opacity(0.4)
+    static var primaryGradient: LinearGradient { ThemeManager.shared.primaryGradient }
+    static var accentGradient: LinearGradient { ThemeManager.shared.accentGradient }
+    static var glowShadow: Color { ThemeManager.shared.glowShadow }
     static let cardShadow = Color.black.opacity(0.3)
 }
 

@@ -4,6 +4,7 @@ import SwiftUI
 struct OnlineView: View {
     @StateObject private var viewModel = OnlineViewModel()
     @EnvironmentObject var libraryManager: LibraryManager // For trending data
+    @FocusState private var isSearchFocused: Bool
     
     var body: some View {
         VStack(spacing: 0) {
@@ -15,6 +16,7 @@ struct OnlineView: View {
                     TextField("Search Tidal...", text: $viewModel.searchText)
                         .textFieldStyle(.plain)
                         .font(.body)
+                        .focused($isSearchFocused)
                     if !viewModel.searchText.isEmpty {
                         Button(action: { viewModel.searchText = "" }) {
                             Image(systemName: "xmark.circle.fill")
@@ -103,14 +105,12 @@ struct OnlineView: View {
                             
                             // Legal Disclaimer
                             VStack(spacing: 8) {
-                                Divider().background(Color.white.opacity(0.2))
-                                
                                 Text("Disclaimer")
                                     .font(.caption.bold())
                                     .foregroundStyle(SangeetTheme.textSecondary)
                                     .padding(.top, 8)
                                 
-                                Text("This tool is provided for educational research purposes only. The developer assumes no liability for copyright infringement or misuse. Users are solely responsible for compliance with local laws and terms of service.")
+                                Text("This tool is provided for educational research purposes only. All content is sourced from the internet; the developer does not host or store any media. The developer assumes no liability for copyright infringement or misuse. Users are solely responsible for compliance with local laws and terms of service.")
                                     .font(.caption2)
                                     .foregroundStyle(.white.opacity(0.7))
                                     .multilineTextAlignment(.center)
@@ -166,6 +166,10 @@ struct OnlineView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                isSearchFocused = false
+            }
         }
         .background(SangeetTheme.background)
         .onAppear {
@@ -215,23 +219,14 @@ struct OnlineSongRow: View {
             
             Spacer()
             
-            // Actions
+            // Download button on hover
             if isHovering {
-                HStack(spacing: 12) {
-                    Button(action: onPlay) {
-                        Image(systemName: "play.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(SangeetTheme.primary)
-                    }
-                    .buttonStyle(.plain)
-                    
-                    Button(action: onDownload) {
-                        Image(systemName: "arrow.down.circle")
-                            .font(.title2)
-                            .foregroundStyle(.white.opacity(0.8))
-                    }
-                    .buttonStyle(.plain)
+                Button(action: onDownload) {
+                    Image(systemName: "arrow.down.circle")
+                        .font(.title2)
+                        .foregroundStyle(.white.opacity(0.8))
                 }
+                .buttonStyle(.plain)
             }
             
             // Duration
@@ -244,6 +239,8 @@ struct OnlineSongRow: View {
         .padding(.horizontal, 12)
         .background(isHovering ? SangeetTheme.surfaceElevated : Color.clear)
         .cornerRadius(8)
+        .contentShape(Rectangle())
+        .onTapGesture { onPlay() }
         .onHover { isHovering = $0 }
     }
     
