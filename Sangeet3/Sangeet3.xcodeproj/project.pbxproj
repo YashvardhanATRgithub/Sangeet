@@ -20,9 +20,6 @@
 		};
 
 /* Begin PBXBuildFile section */
-		6277341F2F0A8AA30091C40C /* TidalDLService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6277341D2F0A8AA30091C40C /* TidalDLService.swift */; };
-		627734232F0A8AE10091C40C /* OnlineViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 627734212F0A8AE10091C40C /* OnlineViewModel.swift */; };
-		627734242F0A8AE10091C40C /* OnlineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 627734202F0A8AE10091C40C /* OnlineView.swift */; };
 		627734262F0A8B0E0091C40C /* DownloadManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 627734252F0A8B0E0091C40C /* DownloadManager.swift */; };
 		62DE57292F02BC4400A1D4EB /* libbass.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 62DE57282F02BC4400A1D4EB /* libbass.dylib */; };
 		62DE572A2F02BC4400A1D4EB /* libbass.dylib in Embed Libraries */ = {isa = PBXBuildFile; fileRef = 62DE57282F02BC4400A1D4EB /* libbass.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
@@ -89,9 +86,6 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		6277341D2F0A8AA30091C40C /* TidalDLService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TidalDLService.swift; sourceTree = "<group>"; };
-		627734202F0A8AE10091C40C /* OnlineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnlineView.swift; sourceTree = "<group>"; };
-		627734212F0A8AE10091C40C /* OnlineViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnlineViewModel.swift; sourceTree = "<group>"; };
 		627734252F0A8B0E0091C40C /* DownloadManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadManager.swift; sourceTree = "<group>"; };
 		62DE55DD2F028D9000A1D4EB /* Sangeet3.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Sangeet3.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		62DE57282F02BC4400A1D4EB /* libbass.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libbass.dylib; path = "../../../Downloads/bass24-osx/libbass.dylib"; sourceTree = "<group>"; };
@@ -172,7 +166,6 @@
 		6277341E2F0A8AA30091C40C /* Network */ = {
 			isa = PBXGroup;
 			children = (
-				6277341D2F0A8AA30091C40C /* TidalDLService.swift */,
 			);
 			path = Network;
 			sourceTree = "<group>";
@@ -180,8 +173,6 @@
 		627734222F0A8AE10091C40C /* Online */ = {
 			isa = PBXGroup;
 			children = (
-				627734202F0A8AE10091C40C /* OnlineView.swift */,
-				627734212F0A8AE10091C40C /* OnlineViewModel.swift */,
 			);
 			path = Online;
 			sourceTree = "<group>";
@@ -353,7 +344,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				6277341F2F0A8AA30091C40C /* TidalDLService.swift in Sources */,
 				FFB00000 /* Sangeet3App.swift in Sources */,
 				FFB00001 /* Data/Lyrics/LyricsService.swift in Sources */,
 				FFB00002 /* Data/Database/Records/TrackRecord.swift in Sources */,
@@ -373,8 +363,6 @@
 				FFB00016 /* Data/Audio/AudiophileSettings.swift in Sources */,
 				FFB00017 /* Data/Audio/PlaybackManager.swift in Sources */,
 				FFB00018 /* Data/Metadata/SmartMetadataManager.swift in Sources */,
-				627734232F0A8AE10091C40C /* OnlineViewModel.swift in Sources */,
-				627734242F0A8AE10091C40C /* OnlineView.swift in Sources */,
 				FFB00019 /* Domain/Entities/Track.swift in Sources */,
 				FFB00020 /* ContentView.swift in Sources */,
 				FFB00021 /* Presentation/Screens/Settings/SettingsView.swift in Sources */,

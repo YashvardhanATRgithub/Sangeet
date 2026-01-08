@@ -544,6 +544,12 @@ final class PlaybackManager: ObservableObject {
         }
     }
     
+    // MARK: - Online Queue (YouTube Music-style Recommendations)
+    
+    /// Fetches similar tracks from Yams and populates the queue
+    // Online queue population removed
+
+    
     // MARK: - Sample Rate Sync
     
     private func syncSampleRateForTrack(_ track: Track) {

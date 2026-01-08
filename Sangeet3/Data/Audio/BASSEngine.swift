@@ -96,6 +96,11 @@ final class BASSEngine: ObservableObject {
         print("[BASSEngine] BASS initialized on device \(deviceNumber) at \(sampleRate)Hz")
         
         BASS_SetConfig(DWORD(BASS_CONFIG_FLOATDSP), 1)
+        
+        // Network streaming configuration
+        BASS_SetConfig(DWORD(BASS_CONFIG_NET_TIMEOUT), 30000) // 30 second timeout
+        BASS_SetConfig(DWORD(BASS_CONFIG_NET_BUFFER), 10000)  // 10 second buffer
+        BASS_SetConfig(DWORD(BASS_CONFIG_NET_PREBUF), 50)     // Pre-buffer 50%
     }
     
     private func observeNotifications() {
@@ -283,7 +288,6 @@ final class BASSEngine: ObservableObject {
         self.onTrackEnd = onEnd
         
         // Create stream
-        // Create stream
         if url.isFileURL {
             currentStream = BASS_StreamCreateFile(
                 BOOL32(truncating: false),
@@ -293,13 +297,18 @@ final class BASSEngine: ObservableObject {
                 DWORD(BASS_STREAM_PRESCAN) | DWORD(BASS_SAMPLE_FLOAT)
             )
         } else {
+            // Network stream - don't use PRESCAN as it can cause issues
+            print("[BASSEngine] Creating network stream for: \(url.absoluteString.prefix(100))...")
             currentStream = BASS_StreamCreateURL(
                 url.absoluteString,
                 0,
-                DWORD(BASS_STREAM_PRESCAN) | DWORD(BASS_SAMPLE_FLOAT),
+                DWORD(BASS_SAMPLE_FLOAT), // No PRESCAN for network streams
                 nil,
                 nil
             )
+            if currentStream == 0 {
+                print("[BASSEngine] Network stream failed, error: \(BASS_ErrorGetCode())")
+            }
         }
         
         if currentStream == 0 {
@@ -358,13 +367,13 @@ final class BASSEngine: ObservableObject {
                 flags
             )
         } else {
-            // Remote URL
-            // Ensure flags don't include PRESCAN if it causes issues, but for now keep consistent
-            // BASS_StreamCreateURL takes (url, offset, flags, proc, user)
+            // Remote URL - remove PRESCAN flag for network streams
+            let networkFlags = flags & ~DWORD(BASS_STREAM_PRESCAN)
+            print("[BASSEngine] Creating network stream (crossfade) for: \(url.absoluteString.prefix(80))...")
             stream = BASS_StreamCreateURL(
                 url.absoluteString,
                 0,
-                flags,
+                networkFlags,
                 nil,
                 nil
             )

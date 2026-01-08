@@ -67,7 +67,7 @@ struct HomeView: View {
             }
         }
         .onAppear {
-            Task { await libraryManager.fetchTopSongs() }
+            // Online fetch removed
         }
     }
     
@@ -167,99 +167,6 @@ struct QuickActionCard: View {
     }
 }
 
-struct TrendingSongCard: View {
-    let song: ITunesSong
-    @State private var isHovering = false
-    @ObservedObject private var downloadManager = DownloadManager.shared
-    @EnvironmentObject var libraryManager: LibraryManager
-    
-    /// Check if this song is already downloaded
-    private var isDownloaded: Bool {
-        libraryManager.tracks.contains { track in
-            track.title.lowercased() == song.name.lowercased() &&
-            track.artist.lowercased() == song.artistName.lowercased() &&
-            !track.isRemote
-        }
-    }
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ZStack(alignment: .topTrailing) {
-                AsyncImage(url: song.artworkURL) { phase in
-                    switch phase {
-                    case .empty: Color.gray.opacity(0.3)
-                    case .success(let image): image.resizable()
-                    case .failure: Color.gray.opacity(0.3)
-                    @unknown default: Color.gray.opacity(0.3)
-                    }
-                }
-                .frame(width: 140, height: 140)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                
-                // Download button overlay on hover - MORE VISIBLE
-                if isHovering && !isDownloaded {
-                    Button(action: downloadSong) {
-                        ZStack {
-                            Circle()
-                                .fill(.black.opacity(0.7))
-                                .frame(width: 36, height: 36)
-                            Image(systemName: "arrow.down.circle.fill")
-                                .font(.system(size: 28))
-                                .foregroundStyle(SangeetTheme.primary)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .padding(6)
-                    .transition(.scale.combined(with: .opacity))
-                }
-                
-                // Downloaded indicator - MORE VISIBLE
-                if isDownloaded {
-                    ZStack {
-                        Circle()
-                            .fill(.black.opacity(0.6))
-                            .frame(width: 28, height: 28)
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 20))
-                            .foregroundStyle(SangeetTheme.primary)
-                    }
-                    .padding(6)
-                }
-            }
-            .onHover { isHovering = $0 }
-            .animation(.easeInOut(duration: 0.2), value: isHovering)
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text(song.name)
-                    .font(.subheadline.bold())
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                Text(song.artistName)
-                    .font(.caption)
-                    .foregroundStyle(SangeetTheme.textSecondary)
-                    .lineLimit(1)
-            }
-        }
-        .frame(width: 140)
-    }
-    
-    private func downloadSong() {
-        // Search on Tidal and download
-        Task {
-            let query = "\(song.name) \(song.artistName)"
-            do {
-                let results = try await TidalDLService.shared.search(query: query)
-                if let tidalTrack = results.first {
-                    await MainActor.run {
-                        downloadManager.download(track: tidalTrack)
-                    }
-                }
-            } catch {
-                print("[TrendingSongCard] Download error: \(error)")
-            }
-        }
-    }
-}
 
 // SongRow struct removed as it is replaced by UniversalSongRow
 
