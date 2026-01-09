@@ -20,6 +20,7 @@ struct TidalTrack: Codable, Identifiable, Sendable {
     let artist: TidalArtist?
     let artists: [TidalArtist]?
     let album: TidalAlbum
+    let releaseDate: String? // Added for Era Matching
     
     // Helper to get primary artist name
     var artistName: String {
@@ -85,7 +86,7 @@ actor TidalDLService {
     // MARK: - Search
     
     func search(query: String) async throws -> [TidalTrack] {
-        var components = URLComponents(string: "https://vogel.qqdl.site/search/")
+        var components = URLComponents(string: "https://tidal-api.binimum.org/search/")
         components?.queryItems = [URLQueryItem(name: "s", value: query)]
         
         guard let url = components?.url else { return [] }
@@ -116,11 +117,29 @@ actor TidalDLService {
         }
     }
     
-    // MARK: - Stream
+    // MARK: - Recommendations
+    
+    func getSimilarArtists(id: Int) async throws -> [TidalArtist] {
+        let urlString = "https://tidal-api.binimum.org/artist/similar/?id=\(id)&limit=5"
+        guard let url = URL(string: urlString) else { return [] }
+        
+        print("[TidalService] Fetching Similar Artists: \(url.absoluteString)")
+        
+        // Response format: {"version":..., "artists": [...]}
+        // We need a wrapper struct or just parse directly
+        
+        struct SimilarArtistsResponse: Codable {
+            let artists: [TidalArtist]
+        }
+        
+        let (data, _) = try await session.data(from: url)
+        let wrapper = try JSONDecoder().decode(SimilarArtistsResponse.self, from: data)
+        return wrapper.artists
+    }
     
     func getStreamURL(trackID: Int, quality: TidalQuality = .LOSSLESS) async throws -> URL? {
         // Based on main.py: /track/?id=...&quality=... returns Tidal playbackinfo inside 'data'
-        let urlString = "https://vogel.qqdl.site/track/?id=\(trackID)&quality=\(quality.rawValue)"
+        let urlString = "https://tidal-api.binimum.org/track/?id=\(trackID)&quality=\(quality.rawValue)"
         guard let url = URL(string: urlString) else { return nil }
         
         print("[TidalService] Fetching Stream: \(url.absoluteString)")
@@ -200,7 +219,41 @@ actor TidalDLService {
                     if let u = dataObj["url"] as? String { return URL(string: u) }
                 }
             }
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                print("[TidalService] Raw JSON keys: \(json.keys)")
+                if let dataObj = json["data"] as? [String: Any] {
+                    if let u = dataObj["url"] as? String { return URL(string: u) }
+                }
+            }
             return nil
         }
     }
+    
+    // MARK: - Track Radio (Mix)
+    
+    func getTrackRadio(trackID: Int) async throws -> [TidalTrack] {
+        let urlString = "https://tidal-api.binimum.org/track/radio/?id=\(trackID)"
+        guard let url = URL(string: urlString) else { return [] }
+        
+        let (data, _) = try await session.data(from: url)
+        
+        // Tidal Mix Items response is usually a list of items
+        struct MixResponse: Codable {
+            let items: [MixItem]
+        }
+        struct MixItem: Codable {
+            let item: TidalTrack?
+        }
+        
+        do {
+            let response = try JSONDecoder().decode(MixResponse.self, from: data)
+            return response.items.compactMap { $0.item }
+        } catch {
+            print("[TidalService] Track Radio Decode Error: \(error)")
+            // Fallback: Check if it's directly a list or wrapped differently
+            return []
+        }
+    }
+        
+
 }

@@ -1,5 +1,6 @@
-# Sangeet 3.0
-> **The Ultimate Audiophile Music Player for macOS**
+# Sangeet v3.2.0 - The Intelligent Audiophile Player
+
+> "Smart Queue, Mood Matching, and Offline Intelligence."
 
 ![Project Walkthrough](Screenshots/walkthrough.gif)
 

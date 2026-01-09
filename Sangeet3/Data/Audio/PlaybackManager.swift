@@ -133,22 +133,50 @@ final class PlaybackManager: ObservableObject {
         let wasPlaying = isPlaying
         let time = currentTime
         
-        do {
-            try player.load(url: track.fileURL) { [weak self] in
-                self?.handleTrackEnd()
+        // Use a background task to handle potential URL resolution
+        Task {
+            var urlToLoad = track.fileURL
+            
+            // If it's a Tidal track, we MUST re-resolve the URL because:
+            // 1. The original 'fileURL' is likely 'tidal://...' which BASS can't play directly.
+            // 2. Even if we had the HTTP URL, it might have expired.
+            if track.fileURL.absoluteString.hasPrefix("tidal://") {
+                let idStr = track.fileURL.absoluteString.replacingOccurrences(of: "tidal://", with: "")
+                if let id = Int(idStr), let streamURL = try? await TidalDLService.shared.getStreamURL(trackID: id, quality: .HIGH) {
+                    urlToLoad = streamURL
+                    print("[PlaybackManager] Resolved new stream URL for reload")
+                } else {
+                    print("[PlaybackManager] Failed to resolve stream URL for reload")
+                    return // Abort if we can't get a stream
+                }
             }
             
-            if time > 0 {
-                player.seek(to: time)
+            await MainActor.run {
+                do {
+                    // Suppress 'handleTrackEnd' during reload to prevent skipping
+                    // We simply pass a closure that checks if we are actually at the end later?
+                    // Or detection relies on BASS events.
+                    // For now, standard handler is fine as long as we seek correctly.
+                    
+                    try player.load(url: urlToLoad) { [weak self] in
+                        self?.handleTrackEnd()
+                    }
+                    
+                    if time > 0 {
+                        // Small buffer for network streams
+                        player.seek(to: time)
+                    }
+                    
+                    if wasPlaying {
+                        player.play()
+                        self.isPlaying = true // Ensure UI state matches
+                    }
+                    
+                    print("[PlaybackManager] Track reloaded successfully at \(time)s")
+                } catch {
+                    print("[PlaybackManager] Reload failed: \(error)")
+                }
             }
-            
-            if wasPlaying {
-                player.play()
-            }
-            
-            print("[PlaybackManager] Track reloaded successfully")
-        } catch {
-            print("[PlaybackManager] Reload failed: \(error)")
         }
     }
     
@@ -175,6 +203,32 @@ final class PlaybackManager: ObservableObject {
     
     func play(_ track: Track) {
         guard !isTransitioning else { return }
+        
+        // Context Switch: If track is NOT in the current queue, start a new queue context.
+        if let index = queue.firstIndex(where: { $0.id == track.id }) {
+            self.queueIndex = index
+        } else {
+            // New Context (e.g. Played from Search)
+            self.queue = [track]
+            self.queueIndex = 0
+            print("[PlaybackManager] Context Switch: Reset queue for '\(track.title)'")
+        }
+        
+        // Dynamic Smart Queue (Instant Update)
+        if isInfiniteQueueEnabled {
+            Task { await updateSmartQueue(for: track) }
+        } else {
+            // Even if infinite queue is off, we should pre-cache existing songs
+            preCacheUpcomingTracks()
+        }
+        
+        // Handle Remote Tidal Tracks (Smart Queue)
+        if track.isRemote && track.fileURL.absoluteString.hasPrefix("tidal://") {
+             handleRemoteTidalPlayback(track)
+             return
+        }
+        
+        // ... Normal Playback Logic ...
         
         // Check if we should crossfade (a song is currently playing)
         let shouldCrossfade = crossfadeEnabled && isPlaying && currentTrack != nil
@@ -296,6 +350,63 @@ final class PlaybackManager: ObservableObject {
         if !isPlaying { saveState() }
     }
     
+    // MARK: - Remote Playback
+    
+    private func handleRemoteTidalPlayback(_ track: Track) {
+        let tidalIDString = track.fileURL.absoluteString.replacingOccurrences(of: "tidal://", with: "")
+        guard let tidalID = Int(tidalIDString) else {
+            print("[PlaybackManager] Invalid Tidal ID: \(tidalIDString)")
+            return
+        }
+        
+        print("[PlaybackManager] resolving remote Tidal track: \(tidalID)")
+        
+        // Update UI immediately
+        currentTrack = track
+        isPlaying = true
+        currentTime = 0
+        duration = 0 // Will update when stream loads
+        
+        // Stop current if playing
+        player.pause()
+        stopPositionTimer()
+        
+        Task {
+            do {
+                if let streamURL = try await TidalDLService.shared.getStreamURL(trackID: tidalID, quality: .HIGH) {
+                    await MainActor.run {
+                        // Create a temporary "Streamable" track with the resolved URL
+                        // Or pass URL directly to BASS
+                        do {
+                             try self.player.load(url: streamURL) { [weak self] in
+                                 self?.handleTrackEnd()
+                             }
+                             // Sync metadata again just in case
+                             let image = track.artworkData.flatMap { NSImage(data: $0) }
+                             SystemMediaManager.shared.updateNowPlaying(track: track, image: image)
+                             
+                             self.player.play()
+                             self.startPositionTimer()
+                             
+                             if self.duration == 0 {
+                                 self.duration = self.player.duration
+                             }
+                        } catch {
+                            print("[PlaybackManager] BASS Load Error (Stream): \(error)")
+                            self.isPlaying = false
+                        }
+                    }
+                } else {
+                    print("[PlaybackManager] Failed to get stream URL for \(tidalID)")
+                    await MainActor.run { self.isPlaying = false }
+                }
+            } catch {
+                 print("[PlaybackManager] Tidal Stream Resolve Error: \(error)")
+                 await MainActor.run { self.isPlaying = false }
+            }
+        }
+    }
+    
     // MARK: - Track Transitions
     
     private func handleTrackEnd() {
@@ -344,81 +455,116 @@ final class PlaybackManager: ObservableObject {
         
         queueIndex += 1
         
-        // Infinite Queue Logic - Add more songs BEFORE checking queue end
         if queueIndex >= queue.count && isInfiniteQueueEnabled {
-            print("[PlaybackManager] Infinite Queue: Queue ended, appending similar songs...")
-            // Synchronously add songs to prevent queue from being empty
-            let library = LibraryManager.shared.tracks
-            guard !library.isEmpty else {
-                // Fall through to regular queue end logic
-                if repeatMode == .all {
-                    queueIndex = 0
-                } else {
-                    queueIndex = queue.count - 1
-                    isPlaying = false
-                    player.pause()
-                    stopPositionTimer()
-                    print("[PlaybackManager] End of queue reached (infinite mode, but library empty)")
-                    return
-                }
-                if let nextTrack = queue[safe: queueIndex] {
-                    play(nextTrack)
-                }
-                return
-            }
-            
-            // Exclude current queue to ensure variety
-            let currentIDs = Set(queue.map { $0.id })
-            let candidates = library.filter { !currentIDs.contains($0.id) }
-            let pool = candidates.isEmpty ? library : candidates
-            let selection = Array(pool.shuffled().prefix(5))
-            
-            if !selection.isEmpty {
-                // Add to queue WITHOUT filtering duplicates since we already filtered
-                queue.append(contentsOf: selection)
-                print("[PlaybackManager] Infinite Queue: Added \(selection.count) songs")
-                
-                // Now queueIndex should be valid
-                if let nextTrack = queue[safe: queueIndex] {
-                    print("[PlaybackManager] Next track (infinite): \(nextTrack.title) (Index: \(queueIndex))")
-                    if manualSkip && crossfadeEnabled {
-                        crossfadeToTrack(nextTrack)
-                    } else if seamlessPlaybackEnabled {
-                        gaplessToNextTrack(nextTrack)
-                    } else {
-                        play(nextTrack)
-                    }
-                    return
-                }
-            }
+             // If somehow empty, try to fill
+             Task { await updateSmartQueue(for: currentTrack ?? queue.last) }
         }
         
         if queueIndex >= queue.count {
-            if repeatMode == .all {
-                queueIndex = 0
+             if repeatMode == .all {
+                 queueIndex = 0
+             } else {
+                 queueIndex = queue.count - 1
+                 isPlaying = false
+                 player.pause() // Explicitly stop the engine
+                 stopPositionTimer()
+                 
+                 // Reset UI state
+                 DispatchQueue.main.async {
+                     self.currentTime = 0
+                     self.positionTimer?.invalidate()
+                     self.positionTimer = nil
+                 }
+                 
+                 print("[PlaybackManager] End of queue reached - Playback Stopped")
+                 return
+             }
+             if let nextTrack = queue[safe: queueIndex] {
+                 play(nextTrack)
+             }
+             return
+        }
+        
+        if let nextTrack = queue[safe: queueIndex] {
+            print("[PlaybackManager] Next track: \(nextTrack.title) (Index: \(queueIndex))")
+            
+            // Crossfade only on manual skip (when old track is still playing)
+            if manualSkip && crossfadeEnabled {
+                crossfadeToTrack(nextTrack)
+            } else if seamlessPlaybackEnabled {
+                gaplessToNextTrack(nextTrack)
             } else {
-                queueIndex = queue.count - 1
-                // End of queue reached
-                isPlaying = false
-                player.pause() // Explicitly stop the engine
-                stopPositionTimer()
-                print("[PlaybackManager] End of queue reached")
-                return
+                play(nextTrack)
+            }
+            
+            // Dynamic Queue Update
+            if isInfiniteQueueEnabled {
+                Task { await updateSmartQueue(for: nextTrack) }
             }
         }
+    }
+    
+    // MARK: - Dynamic Smart Queue
+    
+    private var smartQueueTask: Task<Void, Never>?
+    
+    private func updateSmartQueue(for track: Track?) async {
+        guard let seed = track else { return }
         
-        guard let nextTrack = queue[safe: queueIndex] else { return }
-        print("[PlaybackManager] Next track: \(nextTrack.title) (Index: \(queueIndex))")
+        // Cancel previous update to avoid race conditions
+        smartQueueTask?.cancel()
         
-        // Crossfade only on manual skip (when old track is still playing)
-        // On track end, old track is already done so just play next
-        if manualSkip && crossfadeEnabled {
-            crossfadeToTrack(nextTrack)
-        } else if seamlessPlaybackEnabled {
-            gaplessToNextTrack(nextTrack)
-        } else {
-            play(nextTrack)
+        smartQueueTask = Task {
+            // 1. Check if we actually need to update
+            // If we have plenty of songs (e.g. > 10), don't aggressively churn.
+            let shouldUpdate: Bool = await MainActor.run {
+                let remaining = self.queue.count - (self.queueIndex + 1)
+                return remaining < 5 // Only update if running low
+            }
+            
+            if !shouldUpdate && !isInfiniteQueueEnabled { return }
+            
+            // 2. Fetch New Recommendations FIRST (Do not wipe queue yet!)
+            print("[PlaybackManager] Smart Queue: Fetching recommendations for '\(seed.title)'...")
+            
+            async let fastRecsTask = LibraryManager.shared.getFastRecommendations(for: seed)
+            async let deepRecsTask = LibraryManager.shared.getDeepRecommendations(for: seed)
+            
+            let (fastRecs, deepRecs) = await (fastRecsTask, deepRecsTask)
+            
+            if Task.isCancelled { return }
+            
+            await MainActor.run {
+                // Now we have data. We can safely update.
+                
+                // 3. Smart Replace / Append
+                // If we have valid new tracks, we can optionally clear the "old" auto-generated tracks
+                // to make sure the queue matches the current song's vibe perfectly.
+                // But we must NOT touch the 'current' playing track.
+                
+                let newTracks = (fastRecs + deepRecs).filter { track in
+                    // Filter duplicates from entire queue to avoid repetition
+                    !self.queue.contains(where: { $0.id == track.id })
+                }
+                
+                guard !newTracks.isEmpty else {
+                    print("[PlaybackManager] Smart Queue: No new unique tracks found.")
+                    return
+                }
+                
+                // Safe Update Strategy:
+                // Only clear if we are indeed running low (e.g. < 5 songs) OR if we want aggressive mood switching.
+                // Since user complained about empty queue, let's be conservative: JUST APPEND.
+                // Don't clear anything.
+                
+                self.queue.append(contentsOf: newTracks)
+                print("[PlaybackManager] Smart Queue: Appended \(newTracks.count) new tracks.")
+                
+                // 4. Pre-Cache Upcoming
+                self.preCacheUpcomingTracks()
+            }
         }
+        await smartQueueTask?.value
     }
     
     func previous() {
@@ -904,6 +1050,40 @@ final class PlaybackManager: ObservableObject {
                         print("[PlaybackManager] State restored: \(track.title) at \(record.currentTime)s")
                     } catch {
                         print("[PlaybackManager] Restore load error: \(error)")
+                    }
+                }
+            }
+        }
+    }
+    // MARK: - Pre-Caching
+    
+    private func preCacheUpcomingTracks() {
+        guard !queue.isEmpty else { return }
+        
+        let start = queueIndex + 1
+        let end = min(start + 3, queue.count)
+        guard start < end else { return }
+        
+        let candidates = queue[start..<end]
+        
+        Task {
+            for (offset, track) in candidates.enumerated() {
+                // If it's a Tidal track that hasn't been resolved yet
+                if track.isRemote && track.fileURL.scheme == "tidal" {
+                    if let id = Int(track.fileURL.host ?? "") {
+                        // Resolve silently
+                        if let streamURL = try? await TidalDLService.shared.getStreamURL(trackID: id) {
+                            // Update the track in the queue with the resolved URL
+                            let index = start + offset
+                            if index < self.queue.count { // Safety check
+                                await MainActor.run {
+                                    var updatedTrack = self.queue[index]
+                                    updatedTrack.fileURL = streamURL
+                                    self.queue[index] = updatedTrack
+                                    print("[PlaybackManager] Pre-cached (URL Resolved): \(updatedTrack.title)")
+                                }
+                            }
+                        }
                     }
                 }
             }

@@ -333,17 +333,45 @@ struct StatView: View {
 
 struct AboutSheet: View {
     @Environment(\.dismiss) var dismiss
+    @StateObject private var updater = UpdateChecker.shared
+    
     var body: some View {
         VStack(spacing: 16) {
             Image(systemName: "waveform.circle.fill")
                 .font(.system(size: 64))
                 .foregroundStyle(SangeetTheme.primaryGradient)
-            Text("Sangeet 3.0").font(.title.bold())
+            Text("Sangeet \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "3.0")").font(.title.bold())
             Text("Premium Music Player for macOS").font(.body)
+            
+            if updater.updateAvailable {
+                Button(action: {
+                    if let url = updater.releaseURL {
+                         NSWorkspace.shared.open(url)
+                    }
+                }) {
+                    HStack {
+                         Image(systemName: "arrow.down.circle.fill")
+                         Text("Update Available (\(updater.latestVersion))")
+                    }
+                    .padding(8)
+                    .background(Color.green.opacity(0.2))
+                    .cornerRadius(8)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.green)
+            } else {
+                 Text("You are up to date.")
+                     .font(.caption)
+                     .foregroundStyle(.secondary)
+            }
+            
             Button("Done") { dismiss() }
         }
         .padding()
         .frame(width: 300)
+        .onAppear {
+             updater.checkForUpdates()
+        }
     }
 }
 

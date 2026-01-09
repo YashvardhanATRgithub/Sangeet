@@ -258,7 +258,42 @@ async def get_track(id: int, quality: str = "HI_RES_LOSSLESS"):
         "assetpresentation": "FULL",
     }
     return await make_request(track_url, params=params)
+    return await make_request(track_url, params=params)
 
+@app.get("/track/radio/")
+async def get_track_radio(
+    id: str = Query(..., description="Track ID"),
+    country_code: str = Query("US", description="Country Code"),
+):
+    """Fetch Track Radio (Mix) for a given track ID."""
+    token, cred = await get_tidal_token_for_cred()
+    
+    # 1. Get Track Metadata to find Mix ID
+    meta_url = f"https://api.tidal.com/v1/tracks/{id}"
+    meta_data, _, _ = await authed_get_json(meta_url, params={"countryCode": country_code}, token=token, cred=cred)
+    
+    mix_id = None
+    if meta_data and "mixes" in meta_data:
+        mixes = meta_data["mixes"]
+        if "TRACK_MIX" in mixes:
+            mix_id = mixes["TRACK_MIX"]
+            
+    if not mix_id:
+        raise HTTPException(status_code=404, detail="No Track Radio found for this song.")
+        
+    # 2. Fetch Mix Items
+    mix_url = f"https://api.tidal.com/v1/pages/mix?mixId={mix_id}"
+    # Note: Tidal Mix API is tricky. Sometimes it's /v1/mixes/{id}/items
+    # Let's try the direct items endpoint first which is standard
+    mix_url_direct = f"https://api.tidal.com/v1/mixes/{mix_id}/items"
+    
+    data, _, _ = await authed_get_json(
+        mix_url_direct,
+        params={"countryCode": country_code, "limit": 50},
+        token=token,
+        cred=cred,
+    )
+    return data
 @app.api_route("/search/", methods=["GET"])
 async def search(
     s: Union[str, None] = Query(default=None),

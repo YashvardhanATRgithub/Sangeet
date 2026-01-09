@@ -96,6 +96,13 @@ final class BASSEngine: ObservableObject {
         print("[BASSEngine] BASS initialized on device \(deviceNumber) at \(sampleRate)Hz")
         
         BASS_SetConfig(DWORD(BASS_CONFIG_FLOATDSP), 1)
+        
+        // Network Buffering for smoother seeking
+        // Set buffer to 15000ms (15 seconds) and read-ahead
+        BASS_SetConfig(DWORD(BASS_CONFIG_NET_BUFFER), 15000)
+        BASS_SetConfig(DWORD(BASS_CONFIG_NET_READTIMEOUT), 10000)
+        BASS_SetConfig(DWORD(BASS_CONFIG_NET_PREBUF), 30) // Buffer 30% before starting
+        print("[BASSEngine] Network buffer set to 15s")
     }
     
     private func observeNotifications() {

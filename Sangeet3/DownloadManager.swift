@@ -10,6 +10,7 @@ class DownloadManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
         let id: Int
         let track: TidalTrack
         var state: DownloadState
+        var task: URLSessionDownloadTask? // Hold reference to cancel
     }
     
     enum DownloadState: Equatable {
@@ -17,6 +18,7 @@ class DownloadManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
         case downloading(progress: Double)
         case finished
         case failed(String)
+        case cancelled
     }
     
     // TrackID -> DownloadTask
@@ -86,6 +88,27 @@ class DownloadManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
         }
     }
     
+    func cancelDownload(trackID: Int) {
+        guard var task = activeDownloads[trackID] else { return }
+        
+        task.task?.cancel()
+        task.state = .cancelled
+        activeDownloads[trackID] = task
+        
+        // Remove after short delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            if self.activeDownloads[trackID]?.state == .cancelled {
+                self.activeDownloads.removeValue(forKey: trackID)
+            }
+        }
+    }
+    
+    func retryDownload(trackID: Int) {
+        guard let task = activeDownloads[trackID] else { return }
+        // Reset and restart
+        download(track: task.track)
+    }
+    
     @MainActor
     private func startDownload(track: TidalTrack, to directory: URL) async {
         do {
@@ -105,6 +128,14 @@ class DownloadManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
             // 3. Start Download Task (using delegate for progress)
             let downloadTask = downloadSession.downloadTask(with: streamURL)
             downloadTask.taskDescription = "\(track.id)" // Store ID to find task later
+            
+            // Store task reference
+            if var currentTask = activeDownloads[track.id] {
+                currentTask.task = downloadTask
+                currentTask.state = .downloading(progress: 0)
+                activeDownloads[track.id] = currentTask
+            }
+            
             downloadTask.resume()
             
             // Note: Progress updates will come via delegate methods below
@@ -216,6 +247,9 @@ class DownloadManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
                          var finishedTask = task
                          finishedTask.state = .finished
                          self.activeDownloads[id] = finishedTask
+                         
+                         // Notify LibraryManager
+                         NotificationCenter.default.post(name: .init("DownloadDidFinish"), object: nil, userInfo: ["track": task.track])
                          
                          // Trigger Library Scan
                          Task {

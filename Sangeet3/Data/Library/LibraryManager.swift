@@ -39,6 +39,22 @@ final class LibraryManager: ObservableObject {
     
     private init() {
         Task { await setupLibrary() }
+        
+        // Listen for new downloads to instantly update UI
+        NotificationCenter.default.addObserver(
+            forName: .init("DownloadDidFinish"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self = self else { return }
+            // Quickly re-scan or add to tracks manually if we have full metadata
+            // For now, rely on scanAllFolders which is triggered by DownloadManager, 
+            // but we can also force a UI refresh of 'recentlyAdded' here if needed.
+            // The isScanning flag will handle some UI state.
+            
+            // Just ensure we notify observers
+            self.objectWillChange.send()
+        }
     }
     
     // MARK: - Database Loading
@@ -97,7 +113,48 @@ final class LibraryManager: ObservableObject {
     
 
     
-    // MARK: - Folder Management
+    // MARK: - Helper Methods
+    
+    /// Check if a track exists in library with fuzzy matching
+    func hasTrack(title: String, artist: String) -> Bool {
+        // 1. Try exact match (fast)
+        let exactMatch = tracks.contains {
+            $0.title.caseInsensitiveCompare(title) == .orderedSame &&
+            $0.artist.caseInsensitiveCompare(artist) == .orderedSame &&
+            !$0.isRemote
+        }
+        if exactMatch { return true }
+        
+        // 2. Fuzzy match
+        // Often Tidal titles have "(feat. X)" or "Remastered" that local files might miss or have differently
+        // Or "The Beatles" vs "Beatles"
+        
+        let targetTitle = sanitizeString(title)
+        let targetArtist = sanitizeString(artist)
+        
+        return tracks.contains { local in
+            if local.isRemote { return false }
+            
+            let localTitle = sanitizeString(local.title)
+            let localArtist = sanitizeString(local.artist)
+            
+            // Check if one contains the other (e.g. "Orbit" inside "Orbit (Remix)")
+            let titleMatch = localTitle.contains(targetTitle) || targetTitle.contains(localTitle)
+            let artistMatch = localArtist.contains(targetArtist) || targetArtist.contains(localArtist)
+            
+            return titleMatch && artistMatch
+        }
+    }
+    
+    private func sanitizeString(_ str: String) -> String {
+        return str.lowercased()
+            .replacingOccurrences(of: "(feat.*)", with: "", options: .regularExpression)
+            .replacingOccurrences(of: "\\[feat.*\\]", with: "", options: .regularExpression)
+            .replacingOccurrences(of: "\\(remaster.*\\)", with: "", options: .regularExpression)
+            .replacingOccurrences(of: "the ", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .filter { $0.isLetter || $0.isNumber } // Remove punctuation
+    }
     
     func addFolder() {
         let panel = NSOpenPanel()
@@ -602,6 +659,159 @@ final class LibraryManager: ObservableObject {
         }
     }
     
+    // MARK: - Smart Queue Recommendations
+    
+    // MARK: - Smart Queue Recommendations
+    
+    /// Fast: Returns top tracks for the seed artist immediately (1 network call)
+    func getFastRecommendations(for seedTrack: Track) async -> [Track] {
+        print("[LibraryManager] Smart Queue (Fast): Fetching Top Tracks for '\(seedTrack.artist)'")
+        do {
+            // Fix: Search for ARTIST only to get top tracks, not variations of the current song
+            let query = seedTrack.artist
+            let results = try await TidalDLService.shared.search(query: query)
+            
+            // Filter: Exclude current song and its variations (e.g. "Wedding Version")
+            let lowTitle = seedTrack.title.lowercased()
+            let filtered = results.filter { candidate in
+                let candTitle = candidate.title.lowercased()
+                // Standard check: exact match
+                if candTitle == lowTitle { return false }
+                // Fuzzy check: if candidate title contains seed title (e.g. "Ordinary" inside "Ordinary (Wedding)") -> Skip
+                if candTitle.contains(lowTitle) { return false }
+                return true
+            }
+            
+            return resolveTracks(Array(filtered.prefix(2)))
+        } catch {
+            print("[LibraryManager] Smart Queue (Fast) Error: \(error)")
+            return []
+        }
+    }
+    
+    /// Deep: Returns a mix of Track Radio (Mood/Genre) OR Similar Artists
+    func getDeepRecommendations(for seedTrack: Track) async -> [Track] {
+        print("[LibraryManager] Smart Queue (Deep): Generating mix for '\(seedTrack.title)'")
+        
+        // 1. Try Track Radio (Best for Mood/Genre)
+        if seedTrack.isRemote, let seedID = Int(seedTrack.fileURL.host ?? "") {
+             do {
+                 let radioTracks = try await TidalDLService.shared.getTrackRadio(trackID: seedID)
+                 if !radioTracks.isEmpty {
+                     print("[LibraryManager] Smart Queue (Deep): Using Track Radio (Context/Mood Matched: \(radioTracks.count))")
+                     // Filter duplicates and current song
+                     let unique = radioTracks.filter { $0.title != seedTrack.title }
+                     
+                     // We still apply Era Matching to the Radio results just to be sure, or trust Tidal?
+                     // Trust Tidal for Mixes.
+                     return resolveTracks(Array(unique.prefix(15)))
+                 }
+             } catch {
+                 print("[LibraryManager] Smart Queue (Deep): Track Radio not available (\(error)), falling back to Similar Artists.")
+             }
+        }
+        
+        // 2. Fallback: Similar Artists (Legacy Logic)
+        do {
+            // Re-fetch seed to get ID (or optimize)
+            let query = "\(seedTrack.title) \(seedTrack.artist)"
+            let searchResults = try await TidalDLService.shared.search(query: query)
+            
+            guard let seedTidalTrack = searchResults.first else { return [] }
+            guard let artistID = seedTidalTrack.artist?.id ?? seedTidalTrack.artists?.first?.id else { return [] }
+            
+            // Fetch Similar Artists
+            let similarArtists = try await TidalDLService.shared.getSimilarArtists(id: artistID)
+            var candidates: [TidalTrack] = []
+            
+            // Fetch Top Tracks for Similar Artists (Parallel)
+            await withTaskGroup(of: [TidalTrack].self) { group in
+                for artist in similarArtists.prefix(4) {
+                    group.addTask {
+                        do {
+                            let tracks = try await TidalDLService.shared.search(query: artist.name)
+                            return Array(tracks.prefix(3))
+                        } catch {
+                            return []
+                        }
+                    }
+                }
+                
+                for await tracks in group {
+                    candidates.append(contentsOf: tracks)
+                }
+            }
+            
+            // Remove duplicates and shuffle
+            let uniqueCandidates = Array(Set(candidates.map { $0.id })).compactMap { id in
+                candidates.first(where: { $0.id == id })
+            }
+            
+            // Filter by Release Year (Era Matching)
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyy-MM-dd"
+            let seedDate = seedTidalTrack.releaseDate.flatMap { dateFormatter.date(from: $0) }
+            let seedYear = seedDate.map { Calendar.current.component(.year, from: $0) }
+            
+            let eraFiltered = uniqueCandidates.filter { track in
+                guard let seedY = seedYear, 
+                      let trackDateStr = track.releaseDate, 
+                      let date = dateFormatter.date(from: trackDateStr) else {
+                    return true 
+                }
+                let trackYear = Calendar.current.component(.year, from: date)
+                return abs(trackYear - seedY) <= 5
+            }
+            
+            let candidatesToUse = eraFiltered.count > 5 ? eraFiltered : uniqueCandidates
+            let selection = candidatesToUse.shuffled().prefix(15)
+            
+            print("[LibraryManager] Smart Queue (Deep): Found \(selection.count) candidates (Similar + Era).")
+            return resolveTracks(Array(selection))
+            
+        } catch {
+             print("[LibraryManager] Smart Queue (Deep) Error: \(error). Falling back to Offline Shuffle.")
+             // 3. Offline Fallback
+             let localTracks = self.tracks
+             guard !localTracks.isEmpty else { return [] }
+             return Array(localTracks.shuffled().prefix(10))
+        }
+    }
+    
+    // Check for Era Matching:
+    // Helper used inside the closure above
+    // private func getYear(...) - Not needed, we use inline Calendar.current.component
+
+    
+    private func resolveTracks(_ tidalTracks: [TidalTrack]) -> [Track] {
+        var references: [Track] = []
+        for tidalTrack in tidalTracks {
+            if let localTrack = findLocalTrack(title: tidalTrack.title, artist: tidalTrack.artistName) {
+                references.append(localTrack)
+            } else {
+                references.append(Track(
+                    id: UUID(),
+                    title: tidalTrack.title,
+                    artist: tidalTrack.artistName,
+                    album: tidalTrack.albumName,
+                    duration: TimeInterval(tidalTrack.duration),
+                    fileURL: URL(string: "tidal://\(tidalTrack.id)")!,
+                    artworkURL: tidalTrack.coverURL
+                ))
+            }
+        }
+        return references
+    }
+    
+    /// Helper to find local track fuzzy
+    private func findLocalTrack(title: String, artist: String) -> Track? {
+        return tracks.first { track in
+             !track.isRemote &&
+             sanitizeString(track.title) == sanitizeString(title) &&
+             sanitizeString(track.artist) == sanitizeString(artist)
+        }
+    }
+    
     func loadPlaylists() async {
         do {
             let records = try DatabaseManager.shared.read { db in
@@ -652,11 +862,11 @@ final class LibraryManager: ObservableObject {
     
     // MARK: - Trending / Top Songs
     
-    @Published var topSongs: [ITunesSong] = []
+    @Published var topSongs: [TidalTrack] = []
     @Published var isLoadingTopSongs = false
     
     // Explicitly for India
-    @Published var trendingIndiaSongs: [ITunesSong] = []
+    @Published var trendingIndiaSongs: [TidalTrack] = []
     
     private var cacheDirectory: URL {
         FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
@@ -688,52 +898,90 @@ final class LibraryManager: ObservableObject {
     }
     
     func fetchTopSongs() async {
-        // If we have no data, show loading state (unless we have cache)
-        if topSongs.isEmpty {
-            isLoadingTopSongs = true
-        }
+        if topSongs.isEmpty { isLoadingTopSongs = true }
         
+        // 1. Fetch High-Quality curated list from iTunes RSS
         let countryCode = Locale.current.region?.identifier ?? "us"
-        let songs = await fetchSongs(country: countryCode)
+        let iTunesSongs = await fetchITunesTrends(country: countryCode)
+        
+        // 2. Resolve to Tidal Tracks in parallel
+        let resolvedTracks = await resolveToTidal(iTunesSongs)
         
         await MainActor.run {
-            if !songs.isEmpty {
-                self.topSongs = songs
-                self.saveTrendingCache(songs, url: topSongsCacheURL)
+            if !resolvedTracks.isEmpty {
+                self.topSongs = resolvedTracks
             }
             self.isLoadingTopSongs = false
         }
     }
     
     func fetchTrendingIndia() async {
-        let songs = await fetchSongs(country: "in")
+        // 1. Fetch India Trends
+        let iTunesSongs = await fetchITunesTrends(country: "in")
+        
+        // 2. Resolve to Tidal
+        let resolvedTracks = await resolveToTidal(iTunesSongs)
         
         await MainActor.run {
-            if !songs.isEmpty {
-                self.trendingIndiaSongs = songs
-                self.saveTrendingCache(songs, url: trendingIndiaCacheURL)
+            if !resolvedTracks.isEmpty {
+                self.trendingIndiaSongs = resolvedTracks
             }
         }
     }
     
-    private func fetchSongs(country: String) async -> [ITunesSong] {
-        let urlString = "https://itunes.apple.com/\(country)/rss/topsongs/limit=25/json"
-        
+    // MARK: - Hybrid Resolution Logic
+    
+    private func fetchITunesTrends(country: String) async -> [ITunesSimpleSong] {
+        let urlString = "https://itunes.apple.com/\(country)/rss/topsongs/limit=15/json" // Fetch top 15
         guard let url = URL(string: urlString) else { return [] }
         
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
             let feed = try JSONDecoder().decode(ITunesFeedRoot.self, from: data)
-            return feed.feed.entry
+            return feed.feed.entry.map {
+                ITunesSimpleSong(title: $0.title.label, artist: $0.artist.label)
+            }
         } catch {
-            print("[LibraryManager] Fetch songs (\(country)) error: \(error)")
+            print("[LibraryManager] iTunes RSS Error: \(error)")
             return []
         }
     }
     
+    private func resolveToTidal(_ songs: [ITunesSimpleSong]) async -> [TidalTrack] {
+        await withTaskGroup(of: TidalTrack?.self) { group in
+            for song in songs {
+                group.addTask {
+                    let query = "\(song.title) \(song.artist)"
+                    do {
+                        let results = try await TidalDLService.shared.search(query: query)
+                        // Heuristic: Try to find exact match
+                        return results.first
+                    } catch {
+                        return nil
+                    }
+                }
+            }
+            
+            var resolved: [TidalTrack] = []
+            for await track in group {
+                if let track = track {
+                    resolved.append(track)
+                }
+            }
+            // Sort by relevance? Hard since async returns largely random order. 
+            // Ideally we'd map indices but for "Trending" a bit of shuffle is fine.
+            return resolved
+        }
+    }
+    
+    // Removed legacy iTunes fetch methods
+    
     // MARK: - Caching Helpers
     
-    private func saveTrendingCache(_ songs: [ITunesSong], url: URL) {
+    // MARK: - Caching Helpers
+    
+    // Updated to cache TidalTrack instead of ITunesSong
+    private func saveTrendingCache(_ songs: [TidalTrack], url: URL) {
         Task.detached(priority: .background) {
             do {
                 let data = try JSONEncoder().encode(songs)
@@ -744,10 +992,10 @@ final class LibraryManager: ObservableObject {
         }
     }
     
-    private func loadTrendingCache(url: URL) -> [ITunesSong]? {
+    private func loadTrendingCache(url: URL) -> [TidalTrack]? {
         do {
             let data = try Data(contentsOf: url)
-            let songs = try JSONDecoder().decode([ITunesSong].self, from: data)
+            let songs = try JSONDecoder().decode([TidalTrack].self, from: data)
             return songs
         } catch {
             return nil
@@ -790,70 +1038,31 @@ final class LibraryManager: ObservableObject {
     }
 }
 
-// MARK: - iTunes Feed Models
+// MARK: - Private Helper Structs for Hybrid Fetching
 
-struct ITunesFeedRoot: Codable {
+struct ITunesSimpleSong {
+    let title: String
+    let artist: String
+}
+
+private struct ITunesFeedRoot: Codable {
     let feed: ITunesFeed
 }
 
-struct ITunesFeed: Codable {
-    let entry: [ITunesSong]
+private struct ITunesFeed: Codable {
+    let entry: [ITunesEntry]
 }
 
-struct ITunesSong: Codable, Identifiable {
-    let id: ITunesID
+private struct ITunesEntry: Codable {
     let title: ITunesLabel
     let artist: ITunesLabel
-    let images: [ITunesImage]
-    let link: [ITunesLink]
-    
-    var name: String { title.label }
-    var artistName: String { artist.label }
-    var artworkURL: URL? {
-        // Get largest image
-        guard let last = images.last else { return nil }
-        return URL(string: last.label)
-    }
     
     enum CodingKeys: String, CodingKey {
-        case id
         case title = "im:name"
         case artist = "im:artist"
-        case images = "im:image"
-        case link
     }
 }
 
-struct ITunesID: Codable, Hashable {
+private struct ITunesLabel: Codable {
     let label: String
-    let attributes: ITunesAttributes
-}
-
-struct ITunesAttributes: Codable, Hashable {
-    let id: String // Use this for Identifiable
-    
-    enum CodingKeys: String, CodingKey {
-        case id = "im:id"
-    }
-}
-
-struct ITunesLabel: Codable {
-    let label: String
-}
-
-struct ITunesImage: Codable {
-    let label: String // URL string
-}
-
-struct ITunesLink: Codable {
-    let attributes: LinkAttributes
-}
-
-struct LinkAttributes: Codable {
-    let href: String
-}
-
-extension ITunesSong {
-    // Computed id for SwiftUI Identifiable conformance
-    var identity: String { id.attributes.id }
 }

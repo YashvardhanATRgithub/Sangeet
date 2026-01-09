@@ -23,10 +23,12 @@ struct Sangeet3App: App {
                 .environmentObject(libraryManager)
                 .environmentObject(themeManager)
                 .preferredColorScheme(.dark)
+                .onAppear {
+                    UpdateChecker.shared.checkForUpdates()
+                }
         }
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentMinSize)
-
         .commands {
             CommandGroup(replacing: .newItem) { }
             
@@ -73,6 +75,7 @@ struct Sangeet3App: App {
         }
     }
 }
+
 
 // MARK: - App State
 class AppState: ObservableObject {
@@ -123,4 +126,76 @@ class AppState: ObservableObject {
 enum LibraryPathItem: Hashable {
     case album(String) // Album name
     case artist(String) // Artist name
+}
+
+// MARK: - Update Checker (Inlined)
+import AppKit
+import UserNotifications
+
+struct GitHubRelease: Codable {
+    let tag_name: String
+    let html_url: String
+    let body: String
+    let published_at: String
+}
+
+class UpdateChecker: ObservableObject {
+    static let shared = UpdateChecker()
+    
+    @Published var updateAvailable: Bool = false
+    @Published var latestVersion: String = ""
+    @Published var releaseNotes: String = ""
+    @Published var releaseURL: URL?
+    
+    // Dynamically fetch current version
+    private var currentVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+    }
+    
+    func checkForUpdates() {
+        guard let url = URL(string: "https://api.github.com/repos/YashvardhanATRgithub/Sangeet/releases/latest") else { return }
+        
+        URLSession.shared.dataTask(with: url) { data, _, error in
+            guard let data = data, error == nil else { return }
+            
+            do {
+                let release = try JSONDecoder().decode(GitHubRelease.self, from: data)
+                let latestTag = release.tag_name.replacingOccurrences(of: "v", with: "")
+                
+                print("[UpdateChecker] Latest: \(latestTag), Current: \(self.currentVersion)")
+                
+                DispatchQueue.main.async {
+                    if self.isVersion(latestTag, newThan: self.currentVersion) {
+                        self.latestVersion = latestTag
+                        self.releaseNotes = release.body
+                        self.releaseURL = URL(string: release.html_url)
+                        self.updateAvailable = true
+                        
+                        // Send Notification
+                        self.sendUpdateNotification(version: latestTag)
+                    }
+                }
+            } catch {
+                print("Update Check Failed: \(error)")
+            }
+        }.resume()
+    }
+    
+    // Simple semver compare
+    private func isVersion(_ newVer: String, newThan oldVer: String) -> Bool {
+        return newVer.compare(oldVer, options: .numeric) == .orderedDescending
+    }
+    
+    private func sendUpdateNotification(version: String) {
+        let content = UNMutableNotificationContent()
+        content.title = "Update Available"
+        content.body = "Sangeet v\(version) is now available. Click to download."
+        content.sound = .default
+        
+        // Request permission implicitly by adding
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        
+        let request = UNNotificationRequest(identifier: "UpdateAvailable", content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(request)
+    }
 }

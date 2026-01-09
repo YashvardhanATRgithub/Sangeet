@@ -55,6 +55,21 @@ class OnlineViewModel: ObservableObject {
     }
     
     func playTidalTrack(_ track: TidalTrack) {
+        // 1. Check for local copy first
+        if LibraryManager.shared.hasTrack(title: track.title, artist: track.artistName) {
+            // Find the actual track object to play
+            if let localTrack = LibraryManager.shared.tracks.first(where: {
+                // Use strict match for retrieval, or basic fuzzy if strict fails
+                let localTitle = $0.title.lowercased()
+                let targetTitle = track.title.lowercased()
+                return localTitle.contains(targetTitle) || targetTitle.contains(localTitle)
+            }) {
+                print("[OnlineVM] Playing local copy: \(localTrack.title)")
+                playbackManager.play(localTrack)
+                return
+            }
+        }
+    
         Task {
             isLoading = true
             do {
@@ -82,26 +97,26 @@ class OnlineViewModel: ObservableObject {
         }
     }
     
-    func playTrending(_ song: ITunesSong) {
-        // JIT Search and Play
-        let query = "\(song.name) \(song.artistName)"
-        print("[OnlineVM] JIT Search for: \(query)")
+    func playTrending(_ track: TidalTrack) {
+        // Direct play - no "JIT Search" needed because we already have the Tidal metadata!
+        // This guarantees that what you click is what you prevent.
         
-        Task {
-            isLoading = true
-            do {
-                let results = try await tidalService.search(query: query)
-                if let first = results.first {
-                    playTidalTrack(first)
-                } else {
-                    errorMessage = "Song not found on Tidal"
-                }
-            } catch {
-                errorMessage = "JIT Search error: \(error.localizedDescription)"
+        // 1. Check for local copy FIRST (Fuzzy Match)
+        if LibraryManager.shared.hasTrack(title: track.title, artist: track.artistName) {
+            // Find the actual track object to play
+            if let localTrack = LibraryManager.shared.tracks.first(where: {
+                let localTitle = $0.title.lowercased()
+                let targetTitle = track.title.lowercased()
+                return localTitle.contains(targetTitle) || targetTitle.contains(localTitle)
+            }) {
+                print("[OnlineVM] Local match found for trending: \(localTrack.title)")
+                playbackManager.play(localTrack)
+                return
             }
-            // Note: playTidalTrack handles isLoading = false
-            if searchResults.isEmpty { isLoading = false } 
         }
+        
+        // 2. Play Stream directly
+        playTidalTrack(track)
     }
     
     func downloadTrack(_ track: TidalTrack) {

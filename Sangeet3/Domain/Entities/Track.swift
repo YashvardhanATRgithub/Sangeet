@@ -30,7 +30,7 @@ struct Track: Identifiable, Hashable {
     /// Returns true if this track is from a remote streaming URL (not a local file)
     var isRemote: Bool {
         let scheme = fileURL.scheme?.lowercased() ?? ""
-        return scheme == "http" || scheme == "https"
+        return scheme == "http" || scheme == "https" || scheme == "tidal"
     }
     
     init(id: UUID = UUID(), title: String, artist: String = "Unknown Artist", album: String = "Unknown Album", duration: TimeInterval = 0, fileURL: URL, artworkData: Data? = nil, artworkURL: URL? = nil, isFavorite: Bool = false, playCount: Int = 0, lastPlayed: Date? = nil, dateAdded: Date = Date()) {

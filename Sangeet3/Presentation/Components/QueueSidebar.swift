@@ -43,7 +43,7 @@ struct QueueSidebar: View {
             
             Divider().background(Color.white.opacity(0.1))
             
-            if playbackManager.queue.isEmpty {
+            if playbackManager.queue.isEmpty && playbackManager.currentTrack == nil {
                 emptyState
             } else {
                 queueList

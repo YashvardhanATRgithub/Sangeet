@@ -152,21 +152,57 @@ struct TopBarDownloadIndicator: View {
                         .frame(width: 28, height: 28)
                     
                     // Progress Circle
+                    // Progress Circle / Status Icon
                     if case .downloading(let progress) = task.state {
-                        Circle()
-                            .trim(from: 0, to: CGFloat(progress))
-                            .stroke(SangeetTheme.primary, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                            .rotationEffect(.degrees(-90))
-                            .frame(width: 28, height: 28)
+                        ZStack {
+                            Circle()
+                                .trim(from: 0, to: CGFloat(progress))
+                                .stroke(SangeetTheme.primary, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                                .rotationEffect(.degrees(-90))
+                                .frame(width: 28, height: 28)
+                            
+                            // Cancel Button overlay
+                            if isHovering {
+                                Button {
+                                    downloadManager.cancelDownload(trackID: task.id)
+                                } label: {
+                                    Image(systemName: "xmark")
+                                        .font(.caption2.bold())
+                                        .foregroundStyle(.white)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
                     } else if case .preparing = task.state {
                          ProgressView().scaleEffect(0.6)
                     } else if case .finished = task.state {
-                         Image(systemName: "checkmark").font(.caption2.bold()).foregroundStyle(.green)
+                        Button {
+                             downloadManager.activeDownloads.removeValue(forKey: task.id)
+                        } label: {
+                             Image(systemName: "checkmark").font(.caption2.bold()).foregroundStyle(.green)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Dismiss")
+                        
                     } else if case .failed = task.state {
-                         Image(systemName: "exclamationmark").font(.caption2.bold()).foregroundStyle(.red)
+                        Button {
+                            downloadManager.retryDownload(trackID: task.id)
+                        } label: {
+                            Image(systemName: "arrow.clockwise") // Retry icon
+                                .font(.caption2.bold())
+                                .foregroundStyle(.red)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Retry")
+                        
+                    } else if case .cancelled = task.state {
+                        Button {
+                             downloadManager.activeDownloads.removeValue(forKey: task.id)
+                        } label: {
+                             Image(systemName: "xmark").font(.caption2.bold()).foregroundStyle(.gray)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    
-                    // Artwork overlay (optional - maybe too small, let's stick to progress ring)
                 }
                 
                 // Text details on hover
@@ -190,6 +226,39 @@ struct TopBarDownloadIndicator: View {
             .onHover { isHovering = $0 }
             .animation(.spring(response: 0.3), value: isHovering)
             .animation(.default, value: task.state)
+            .onTapGesture {
+                handleTaskTap(task)
+            }
+            .help(helpText(for: task.state))
+            .onAppear {
+                 // Auto-dismiss finished tasks if not dismissed by DownloadManager
+                 if case .finished = task.state {
+                      DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                           // This is handled by DownloadManager but UI can also hide it
+                      }
+                 }
+            }
+        }
+    }
+    
+    private func handleTaskTap(_ task: DownloadManager.DownloadTask) {
+        switch task.state {
+        case .downloading, .preparing:
+            downloadManager.cancelDownload(trackID: task.id)
+        case .failed:
+            downloadManager.retryDownload(trackID: task.id)
+        case .finished, .cancelled:
+            // Dismiss manually
+            downloadManager.activeDownloads.removeValue(forKey: task.id)
+        }
+    }
+    
+    private func helpText(for state: DownloadManager.DownloadState) -> String {
+        switch state {
+        case .downloading, .preparing: return "Click to Cancel"
+        case .failed: return "Click to Retry"
+        case .finished: return "Click to Dismiss"
+        case .cancelled: return "Click to Dismiss"
         }
     }
     
@@ -199,6 +268,7 @@ struct TopBarDownloadIndicator: View {
         case .downloading(let p): return "\(Int(p * 100))%"
         case .finished: return "Done"
         case .failed: return "Failed"
+        case .cancelled: return "Cancelled"
         }
     }
     
