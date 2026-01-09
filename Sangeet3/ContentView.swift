@@ -30,6 +30,7 @@ struct ContentView: View {
                     case .home: HomeView()
                     case .library: LibraryView()
                     case .playlists: PlaylistsView()
+                    case .online: OnlineView()
                     case .settings: SettingsView()
                     }
                 }

@@ -31,7 +31,11 @@ Sangeet is a premium, native macOS music player built for audiophiles who demand
 - **Infinite Queue**: Never stops playing music, automatically queuing similar tracks when your playlist ends.
 - **Stats & History**: Track your listening habits with detailed statistics.
 
-
+### 🌐 Online Streaming
+- **Tidal Integration**: Search and stream high-quality music from Tidal's catalog directly within the app.
+- **Trending Charts**: Browse trending songs from iTunes charts (International & India).
+- **Download Support**: Save online tracks to your local library for offline playback.
+- **Seamless Playback**: Stream with the same audiophile-grade engine as local files.
 
 ---
 
@@ -45,9 +49,9 @@ Sangeet is a premium, native macOS music player built for audiophiles who demand
 |:---:|:---:|
 | ![Songs](Screenshots/songs_screen.png) <br> ![Playlists](Screenshots/playlists_screen.png) | ![Queue](Screenshots/queue_screen.png) <br> ![EQ](Screenshots/eq_screen.png) |
 
-| Settings & Extras |
-|:---:|
-| ![Settings](Screenshots/settings.png) <br> ![Metadata](Screenshots/metadata.png) |
+| Online Streaming | Settings & Extras |
+|:---:|:---:|
+| ![Online](Screenshots/online.png) | ![Settings](Screenshots/settings.png) <br> ![Metadata](Screenshots/metadata.png) |
 
 
 ---
@@ -86,7 +90,8 @@ Special thanks to the creators of the libraries and services that make Sangeet p
 
 - **[Un4seen Developments](https://www.un4seen.com/)**: For the incredible **BASS Audio Library**, which powers the core audio engine, DSP, and gapless playback features.
 - **[Gwendal Roué](https://github.com/groue)**: For **GRDB.swift**, the robust SQLite toolkit that handles the music library database.
-
+- **[Tidal](https://tidal.com/)**: For providing high-quality music streaming capabilities.
+- **[Apple iTunes](https://rss.applemarketingtools.com/)**: For the RSS Feed API powering trending charts.
 - **Apple**: For SwiftUI and CoreAudio.
 
 ---

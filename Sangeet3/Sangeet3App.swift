@@ -85,6 +85,7 @@ class AppState: ObservableObject {
         case home = "Home"
         case library = "Library"
         case playlists = "Playlists"
+        case online = "Online"
         case settings = "Settings"
         
         var icon: String {
@@ -92,6 +93,7 @@ class AppState: ObservableObject {
             case .home: return "house.fill"
             case .library: return "books.vertical.fill"
             case .playlists: return "music.note.list"
+            case .online: return "globe"
             case .settings: return "gearshape.fill"
             }
         }
@@ -112,7 +114,7 @@ class AppState: ObservableObject {
             if !libraryNavigationPath.isEmpty { libraryNavigationPath.removeLast() }
         case .playlists:
             if !playlistNavigationPath.isEmpty { playlistNavigationPath.removeLast() }
-        case .settings:
+        case .online, .settings:
             break
         }
     }
