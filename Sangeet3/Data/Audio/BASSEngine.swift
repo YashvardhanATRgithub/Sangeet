@@ -49,6 +49,11 @@ final class BASSEngine: ObservableObject {
     private var onTrackEnd: (() -> Void)?
     private var isInitialized = false
     
+    /// Check if BASS has a valid stream loaded (used for restored remote tracks)
+    func hasActiveStream() -> Bool {
+        return currentStream != 0
+    }
+    
     // Global sync callback for slide cleanup
     private let slideSyncProc: @convention(c) (HSYNC, DWORD, DWORD, UnsafeMutableRawPointer?) -> Void = { handle, channel, data, user in
         var vol: Float = 0

@@ -46,6 +46,7 @@
 		FFB00015 /* Data/Audio/DACManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00015 /* Data/Audio/DACManager.swift */; };
 		FFB00016 /* Data/Audio/AudiophileSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00016 /* Data/Audio/AudiophileSettings.swift */; };
 		FFB00017 /* Data/Audio/PlaybackManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00017 /* Data/Audio/PlaybackManager.swift */; };
+		FFB00099 /* Data/Audio/StreamCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00099 /* Data/Audio/StreamCache.swift */; };
 		FFB00018 /* Data/Metadata/SmartMetadataManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00018 /* Data/Metadata/SmartMetadataManager.swift */; };
 		FFB00019 /* Domain/Entities/Track.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00019 /* Domain/Entities/Track.swift */; };
 		FFB00020 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00020 /* ContentView.swift */; };
@@ -121,6 +122,7 @@
 		FFA00015 /* Data/Audio/DACManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data/Audio/DACManager.swift; sourceTree = "<group>"; };
 		FFA00016 /* Data/Audio/AudiophileSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data/Audio/AudiophileSettings.swift; sourceTree = "<group>"; };
 		FFA00017 /* Data/Audio/PlaybackManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data/Audio/PlaybackManager.swift; sourceTree = "<group>"; };
+		FFA00099 /* Data/Audio/StreamCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data/Audio/StreamCache.swift; sourceTree = "<group>"; };
 		FFA00018 /* Data/Metadata/SmartMetadataManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data/Metadata/SmartMetadataManager.swift; sourceTree = "<group>"; };
 		FFA00019 /* Domain/Entities/Track.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/Entities/Track.swift; sourceTree = "<group>"; };
 		FFA00020 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -374,6 +376,7 @@
 				FFB00015 /* Data/Audio/DACManager.swift in Sources */,
 				FFB00016 /* Data/Audio/AudiophileSettings.swift in Sources */,
 				FFB00017 /* Data/Audio/PlaybackManager.swift in Sources */,
+				FFB00099 /* Data/Audio/StreamCache.swift in Sources */,
 				FFB00018 /* Data/Metadata/SmartMetadataManager.swift in Sources */,
 				627734232F0A8AE10091C40C /* OnlineViewModel.swift in Sources */,
 				627734242F0A8AE10091C40C /* OnlineView.swift in Sources */,

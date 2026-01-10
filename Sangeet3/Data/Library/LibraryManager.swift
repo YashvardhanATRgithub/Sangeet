@@ -1024,23 +1024,6 @@ final class LibraryManager: ObservableObject {
             return []
         }
     }
-
-    func removeTrackFromPlaylist(_ track: Track, playlist: PlaylistRecord) {
-        DatabaseManager.shared.writeAsync { db in
-            try PlaylistTrackRecord
-                .filter(Column("playlistId") == playlist.id && Column("trackId") == track.id.uuidString)
-                .deleteAll(db)
-        }
-        
-        // Update modified date
-        DatabaseManager.shared.writeAsync { db in
-            var p = playlist
-            p.dateModified = Date()
-            try p.save(db)
-        }
-        
-        print("[LibraryManager] Removed '\(track.title)' from playlist '\(playlist.name)'")
-    }
     
     // MARK: - Trending / Top Songs
     

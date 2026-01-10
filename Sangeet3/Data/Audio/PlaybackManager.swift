@@ -348,6 +348,13 @@ final class PlaybackManager: ObservableObject {
     }
     
     func togglePlayPause() {
+        // If trying to play but BASS has no stream loaded (e.g., restored remote track), trigger full play
+        if !isPlaying, let track = currentTrack, track.isRemote, !player.hasActiveStream() {
+            print("[PlaybackManager] Restored remote track - triggering full play flow")
+            play(track)
+            return
+        }
+        
         isPlaying.toggle()
         
         if isPlaying {
@@ -355,11 +362,8 @@ final class PlaybackManager: ObservableObject {
             startPositionTimer()
         } else {
             player.pause()
-            player.pause()
             stopPositionTimer()
         }
-        
-
         
         SystemMediaManager.shared.updatePlaybackState(isPlaying: isPlaying, elapsedTime: currentTime)
         if !isPlaying { saveState() }
@@ -387,25 +391,54 @@ final class PlaybackManager: ObservableObject {
         stopPositionTimer()
         
         Task {
+            // 1. Check local cache first
+            if let cachedURL = await StreamCache.shared.getCachedFileURL(for: tidalID) {
+                await MainActor.run {
+                    do {
+                        try self.player.load(url: cachedURL) { [weak self] in
+                            self?.handleTrackEnd()
+                        }
+                        let image = track.artworkData.flatMap { NSImage(data: $0) }
+                        SystemMediaManager.shared.updateNowPlaying(track: track, image: image)
+                        
+                        self.player.play()
+                        self.startPositionTimer()
+                        
+                        if self.duration == 0 {
+                            self.duration = self.player.duration
+                        }
+                        print("[PlaybackManager] Loaded from CACHE: \(track.title)")
+                    } catch {
+                        print("[PlaybackManager] Cache Load Error: \(error)")
+                        self.isPlaying = false
+                    }
+                }
+                return
+            }
+            
+            // 2. Resolve stream URL from Tidal API
             do {
                 if let streamURL = try await TidalDLService.shared.getStreamURL(trackID: tidalID, quality: .HIGH) {
                     await MainActor.run {
-                        // Create a temporary "Streamable" track with the resolved URL
-                        // Or pass URL directly to BASS
                         do {
-                             try self.player.load(url: streamURL) { [weak self] in
-                                 self?.handleTrackEnd()
-                             }
-                             // Sync metadata again just in case
-                             let image = track.artworkData.flatMap { NSImage(data: $0) }
-                             SystemMediaManager.shared.updateNowPlaying(track: track, image: image)
-                             
-                             self.player.play()
-                             self.startPositionTimer()
-                             
-                             if self.duration == 0 {
-                                 self.duration = self.player.duration
-                             }
+                            try self.player.load(url: streamURL) { [weak self] in
+                                self?.handleTrackEnd()
+                            }
+                            let image = track.artworkData.flatMap { NSImage(data: $0) }
+                            SystemMediaManager.shared.updateNowPlaying(track: track, image: image)
+                            
+                            self.player.play()
+                            self.startPositionTimer()
+                            
+                            if self.duration == 0 {
+                                self.duration = self.player.duration
+                            }
+                            
+                            // 3. Cache stream in background for offline resume
+                            Task {
+                                await StreamCache.shared.cacheStreamInBackground(from: streamURL, trackID: tidalID)
+                            }
+                            
                         } catch {
                             print("[PlaybackManager] BASS Load Error (Stream): \(error)")
                             self.isPlaying = false
@@ -416,8 +449,8 @@ final class PlaybackManager: ObservableObject {
                     await MainActor.run { self.isPlaying = false }
                 }
             } catch {
-                 print("[PlaybackManager] Tidal Stream Resolve Error: \(error)")
-                 await MainActor.run { self.isPlaying = false }
+                print("[PlaybackManager] Tidal Stream Resolve Error: \(error)")
+                await MainActor.run { self.isPlaying = false }
             }
         }
     }
@@ -616,8 +649,30 @@ final class PlaybackManager: ObservableObject {
                     }
                 }
                 
+                // OFFLINE FALLBACK: If no recommendations, use local library shuffle
+                if finalTracks.isEmpty {
+                    print("[PlaybackManager] Smart Queue: No online recommendations. Falling back to local library shuffle.")
+                    
+                    // Get local tracks only (non-remote), excluding current queue
+                    let localTracks = LibraryManager.shared.tracks.filter { !$0.isRemote }
+                    let existingIds = Set(self.queue.map { $0.id })
+                    
+                    var candidates = localTracks.filter { !existingIds.contains($0.id) }
+                    
+                    // Shuffle and take up to 10
+                    candidates.shuffle()
+                    finalTracks = Array(candidates.prefix(10))
+                    
+                    if finalTracks.isEmpty {
+                        print("[PlaybackManager] Smart Queue: No local tracks available for fallback.")
+                        return
+                    }
+                    
+                    print("[PlaybackManager] Smart Queue: Using \(finalTracks.count) local tracks as fallback.")
+                }
+                
                 guard !finalTracks.isEmpty else {
-                    print("[PlaybackManager] Smart Queue: No new unique tracks found (Filtered \(fastRecs.count + deepRecs.count)).")
+                    print("[PlaybackManager] Smart Queue: No new unique tracks found (Filtered \(fastRecs.count + deepRecs.count)).") 
                     return
                 }
                 
@@ -1074,14 +1129,20 @@ final class PlaybackManager: ObservableObject {
         
         let trackIds = currentQueue.map { $0.id }
         
+        // Collect remote tracks that need metadata saved for restoration
+        let remoteTracks = currentQueue.filter { $0.isRemote }
+        
         DatabaseManager.shared.writeAsync { db in
             try? QueueStateRecord.save(
                 trackIds: trackIds,
                 currentIndex: currentIndex,
                 currentTime: currentTime,
+                remoteTracks: remoteTracks,
                 db: db
             )
         }
+        
+        print("[PlaybackManager] State saved: index=\(currentIndex), time=\(currentTime), remoteTracks=\(remoteTracks.count)")
     }
     
     func restoreState() {
@@ -1095,14 +1156,34 @@ final class PlaybackManager: ObservableObject {
             let savedIds = record.getTrackIds()
             guard !savedIds.isEmpty else { return }
             
-            // Map IDs to real track objects from LibraryManager
+            // Get saved remote track metadata
+            let remoteTrackLookup: [UUID: Track] = {
+                var lookup = [UUID: Track]()
+                for track in record.getRemoteTracks() {
+                    lookup[track.id] = track
+                }
+                return lookup
+            }()
+            
+            // Map IDs to real track objects from LibraryManager OR from saved remote metadata
             let tracks = await MainActor.run {
-                savedIds.compactMap { id in
-                    LibraryManager.shared.tracks.first(where: { $0.id == id })
+                savedIds.compactMap { id -> Track? in
+                    // First, try local library
+                    if let localTrack = LibraryManager.shared.tracks.first(where: { $0.id == id }) {
+                        return localTrack
+                    }
+                    // Otherwise, check saved remote metadata
+                    if let remoteTrack = remoteTrackLookup[id] {
+                        return remoteTrack
+                    }
+                    return nil
                 }
             }
             
-            guard !tracks.isEmpty else { return }
+            guard !tracks.isEmpty else {
+                print("[PlaybackManager] Restore failed: no tracks could be resolved from saved IDs.")
+                return
+            }
             
             await MainActor.run {
                 self.queue = tracks
@@ -1114,25 +1195,36 @@ final class PlaybackManager: ObservableObject {
                     self.currentTime = record.currentTime
                     self.duration = track.duration
                     
-                    // Load into player but DO NOT PLAY
-                    do {
-                        try self.player.load(url: track.fileURL) { [weak self] in
-                            self?.handleTrackEnd()
-                        }
-                        
-                        // Seek to saved time
-                        if record.currentTime > 0 {
-                            self.player.seek(to: record.currentTime)
-                        }
-                        
-                        // Update system info
+                    // For remote tracks, we can't load immediately without resolving the URL.
+                    // We'll load the track state (UI shows it), but actual playback requires
+                    // user to press play, which will trigger URL resolution.
+                    if track.isRemote {
+                        // Just update UI state, don't try to load the tidal:// URL into BASS
                         let image = track.artworkData.flatMap { NSImage(data: $0) }
                         SystemMediaManager.shared.updateNowPlaying(track: track, image: image)
                         SystemMediaManager.shared.updatePlaybackState(isPlaying: false, elapsedTime: record.currentTime)
-                        
-                        print("[PlaybackManager] State restored: \(track.title) at \(record.currentTime)s")
-                    } catch {
-                        print("[PlaybackManager] Restore load error: \(error)")
+                        print("[PlaybackManager] State restored (Remote): \(track.title) at \(record.currentTime)s - Press Play to stream")
+                    } else {
+                        // Load local track into player but DO NOT PLAY
+                        do {
+                            try self.player.load(url: track.fileURL) { [weak self] in
+                                self?.handleTrackEnd()
+                            }
+                            
+                            // Seek to saved time
+                            if record.currentTime > 0 {
+                                self.player.seek(to: record.currentTime)
+                            }
+                            
+                            // Update system info
+                            let image = track.artworkData.flatMap { NSImage(data: $0) }
+                            SystemMediaManager.shared.updateNowPlaying(track: track, image: image)
+                            SystemMediaManager.shared.updatePlaybackState(isPlaying: false, elapsedTime: record.currentTime)
+                            
+                            print("[PlaybackManager] State restored (Local): \(track.title) at \(record.currentTime)s")
+                        } catch {
+                            print("[PlaybackManager] Restore load error: \(error)")
+                        }
                     }
                 }
             }

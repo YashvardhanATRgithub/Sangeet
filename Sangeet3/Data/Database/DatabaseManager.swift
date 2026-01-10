@@ -161,6 +161,18 @@ final class DatabaseManager: ObservableObject {
             }
         }
         
+        // Version 5: Add remoteTracksMetadata to queueState for restoring remote tracks
+        migrator.registerMigration("v5_queue_remote_metadata") { db in
+            if try db.tableExists("queueState") {
+                let columns = try db.columns(in: "queueState")
+                if !columns.contains(where: { $0.name == "remoteTracksMetadata" }) {
+                    try db.alter(table: "queueState") { t in
+                        t.add(column: "remoteTracksMetadata", .text)
+                    }
+                }
+            }
+        }
+        
         return migrator
     }
     

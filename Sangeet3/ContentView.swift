@@ -137,5 +137,37 @@ struct ContentView: View {
                 }
             }
         }
+        .onAppear {
+            setupArrowKeyMonitor()
+        }
+    }
+    
+    // MARK: - Smart Arrow Key Handling
+    
+    private func setupArrowKeyMonitor() {
+        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            // Check if a text field is focused
+            if let firstResponder = NSApp.keyWindow?.firstResponder,
+               firstResponder is NSTextView || firstResponder is NSTextField {
+                // Let text field handle the event normally
+                return event
+            }
+            
+            // No modifier keys (except for allowing with no modifiers)
+            guard event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty else {
+                return event
+            }
+            
+            switch event.keyCode {
+            case 123: // Left Arrow
+                playbackManager.seek(to: playbackManager.currentTime - 5)
+                return nil // Event consumed
+            case 124: // Right Arrow
+                playbackManager.seek(to: playbackManager.currentTime + 5)
+                return nil // Event consumed
+            default:
+                return event
+            }
+        }
     }
 }

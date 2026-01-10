@@ -48,17 +48,8 @@ struct Sangeet3App: App {
                 }
                 .keyboardShortcut(.leftArrow, modifiers: .command)
                 
-                Divider()
-                
-                Button("Seek Forward 5s") {
-                    playbackManager.seek(to: playbackManager.currentTime + 5)
-                }
-                .keyboardShortcut(.rightArrow, modifiers: [])
-                
-                Button("Seek Backward 5s") {
-                    playbackManager.seek(to: playbackManager.currentTime - 5)
-                }
-                .keyboardShortcut(.leftArrow, modifiers: [])
+                // Arrow key seeking is handled by custom event monitor in ContentView
+                // to allow normal text editing in search fields
                 
                 Divider()
                 
