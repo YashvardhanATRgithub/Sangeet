@@ -1,4 +1,4 @@
-# Sangeet v3.3.0 - The Intelligent Audiophile Player
+# Sangeet v3.3.1 - The Intelligent Audiophile Player
 
 > "Smart Queue, Mood Matching, and Offline Intelligence."
 

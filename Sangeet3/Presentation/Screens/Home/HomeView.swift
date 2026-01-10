@@ -85,7 +85,7 @@ struct HomeView: View {
                     HStack(spacing: 16) {
                         ForEach(libraryManager.recentlyPlayedSongs) { track in
                             SongCard(track: track) {
-                                playbackManager.playQueue(tracks: [track])
+                                playbackManager.startRadio(from: track)
                             }
                         }
                     }
@@ -106,7 +106,7 @@ struct HomeView: View {
                     HStack(spacing: 16) {
                         ForEach(libraryManager.recentlyAddedSongs) { track in
                             SongCard(track: track) {
-                                playbackManager.playQueue(tracks: [track])
+                                playbackManager.startRadio(from: track)
                             }
                         }
                     }
@@ -125,9 +125,9 @@ struct HomeView: View {
                 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 16) {
-                        ForEach(Array(libraryManager.mostListenedSongs.enumerated()), id: \.element.id) { index, track in
+                        ForEach(libraryManager.mostListenedSongs) { track in
                             SongCard(track: track) {
-                                playbackManager.playQueue(tracks: libraryManager.mostListenedSongs, startIndex: index)
+                                playbackManager.startRadio(from: track)
                             }
                         }
                     }
