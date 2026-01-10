@@ -99,11 +99,20 @@ final class PlaybackManager: ObservableObject {
     }
     
     private func handleSettingsChanged() {
-        // Reinitialize BASS with new settings
-        player.initBASS()
-        
-        // Reload current track if any
-        reloadCurrentTrack()
+        // If playing online content, IGNORE audiophile setting changes to prevent skipping/stopping.
+        if let track = currentTrack, track.isRemote {
+            print("[PlaybackManager] Audiophile settings ignored for Online Content to preserve playback stability.")
+            return
+        }
+
+        // CoreAudio Stability Delay: Allow 500ms for device to settle (e.g. sample rate switch)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            // Reinitialize BASS with new settings
+            self?.player.initBASS()
+            
+            // Reload current track if any
+            self?.reloadCurrentTrack()
+        }
     }
     
     private func handleDeviceChanged(_ notification: Notification) {
@@ -154,9 +163,7 @@ final class PlaybackManager: ObservableObject {
             await MainActor.run {
                 do {
                     // Suppress 'handleTrackEnd' during reload to prevent skipping
-                    // We simply pass a closure that checks if we are actually at the end later?
-                    // Or detection relies on BASS events.
-                    // For now, standard handler is fine as long as we seek correctly.
+                    self.isReloading = true
                     
                     try player.load(url: urlToLoad) { [weak self] in
                         self?.handleTrackEnd()
@@ -173,8 +180,16 @@ final class PlaybackManager: ObservableObject {
                     }
                     
                     print("[PlaybackManager] Track reloaded successfully at \(time)s")
+                    
+                    // Allow 1.5 seconds for BASS/CoreAudio to stabilize before accepting Track End events
+                    // This prevents FLAC Syncword errors or initial glitches from skipping the song
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                        self?.isReloading = false
+                    }
+                    
                 } catch {
                     print("[PlaybackManager] Reload failed: \(error)")
+                    self.isReloading = false
                 }
             }
         }
@@ -409,10 +424,19 @@ final class PlaybackManager: ObservableObject {
     
     // MARK: - Track Transitions
     
+    private var isReloading = false
+
     private func handleTrackEnd() {
+        guard !isReloading else {
+            print("[PlaybackManager] Track End ignored (Reloading)")
+            return
+        }
+
         if let track = currentTrack {
             Task { @MainActor in
                 LibraryManager.shared.incrementPlayCount(track)
+                // ML: Record Full Play
+                RecommendationEngine.shared.recordInteraction(for: track, type: .playedFully)
             }
         }
         
@@ -422,6 +446,21 @@ final class PlaybackManager: ObservableObject {
     }
     
     func next(manualSkip: Bool = false) {
+        // ML Skip Logic
+        if manualSkip, let track = currentTrack {
+             let time = self.currentTime
+             // If manual skip (and not just finished), check duration
+             // Only if current time is small (meaning user HIT next)
+             // But be careful: if song finished naturally, manualSkip is false.
+             // If user hits NEXT, manualSkip is true.
+             
+             if time < 10 {
+                 RecommendationEngine.shared.recordInteraction(for: track, type: .skippedImmediate)
+             } else if time < 30 {
+                 RecommendationEngine.shared.recordInteraction(for: track, type: .skippedEarly)
+             }
+        }
+
         // Block all skips during crossfade transition
         guard !isTransitioning else {
             print("[PlaybackManager] Skip blocked (transitioning)")
@@ -431,7 +470,7 @@ final class PlaybackManager: ObservableObject {
         // Debounce: ignore rapid manual skips (1 second minimum between skips)
         if manualSkip {
             let now = Date()
-            guard now.timeIntervalSince(lastSkipTime) > 0.5 else { // Reduced to 0.5s for better feel
+            guard now.timeIntervalSince(lastSkipTime) > 0.5 else { 
                 print("[PlaybackManager] Skip ignored (debounce)")
                 return
             }
@@ -524,11 +563,14 @@ final class PlaybackManager: ObservableObject {
             
             if !shouldUpdate && !isInfiniteQueueEnabled { return }
             
-            // 2. Fetch New Recommendations FIRST (Do not wipe queue yet!)
+            // 2. Fetch New Recommendations FIRST
             print("[PlaybackManager] Smart Queue: Fetching recommendations for '\(seed.title)'...")
             
-            async let fastRecsTask = LibraryManager.shared.getFastRecommendations(for: seed)
-            async let deepRecsTask = LibraryManager.shared.getDeepRecommendations(for: seed)
+            // Capture current queue for exclusion
+            let currentQueueSnapshot = await MainActor.run { return self.queue }
+            
+            async let fastRecsTask = LibraryManager.shared.getFastRecommendations(for: seed, exclude: currentQueueSnapshot)
+            async let deepRecsTask = LibraryManager.shared.getDeepRecommendations(for: seed, exclude: currentQueueSnapshot)
             
             let (fastRecs, deepRecs) = await (fastRecsTask, deepRecsTask)
             
@@ -537,28 +579,53 @@ final class PlaybackManager: ObservableObject {
             await MainActor.run {
                 // Now we have data. We can safely update.
                 
-                // 3. Smart Replace / Append
-                // If we have valid new tracks, we can optionally clear the "old" auto-generated tracks
-                // to make sure the queue matches the current song's vibe perfectly.
-                // But we must NOT touch the 'current' playing track.
+                // 3. Robust Duplicate Filtering
+                // We must filter out tracks that are already in the queue, even if IDs differ (e.g. Album vs Single)
+                // We use a simplified sanitization here to match what LibraryManager does.
                 
-                let newTracks = (fastRecs + deepRecs).filter { track in
-                    // Filter duplicates from entire queue to avoid repetition
-                    !self.queue.contains(where: { $0.id == track.id })
+                func fastSanitize(_ s: String) -> String {
+                    return s.lowercased()
+                        .replacingOccurrences(of: "\\(.*?\\)", with: "", options: .regularExpression)
+                        .replacingOccurrences(of: "\\[.*?\\]", with: "", options: .regularExpression)
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                        .filter { $0.isLetter || $0.isNumber }
                 }
                 
-                guard !newTracks.isEmpty else {
-                    print("[PlaybackManager] Smart Queue: No new unique tracks found.")
+                let existingSignatures = Set(self.queue.map { fastSanitize($0.title + $0.artist) })
+                
+                let uniqueTracks = (fastRecs + deepRecs).filter { track in
+                    // 1. Check ID
+                    if self.queue.contains(where: { $0.id == track.id }) { return false }
+                    
+                    // 2. Check Title+Artist Signature
+                    let sig = fastSanitize(track.title + track.artist)
+                    if existingSignatures.contains(sig) { return false }
+                    
+                    return true
+                }
+                
+                // 3. Remove duplicates within the new batch itself
+                var finalTracks: [Track] = []
+                var seenSigs: Set<String> = []
+                
+                for track in uniqueTracks {
+                    let sig = fastSanitize(track.title + track.artist)
+                    if !seenSigs.contains(sig) {
+                        seenSigs.insert(sig)
+                        finalTracks.append(track)
+                    }
+                }
+                
+                guard !finalTracks.isEmpty else {
+                    print("[PlaybackManager] Smart Queue: No new unique tracks found (Filtered \(fastRecs.count + deepRecs.count)).")
                     return
                 }
                 
                 // Safe Update Strategy:
-                // Only clear if we are indeed running low (e.g. < 5 songs) OR if we want aggressive mood switching.
                 // Since user complained about empty queue, let's be conservative: JUST APPEND.
-                // Don't clear anything.
                 
-                self.queue.append(contentsOf: newTracks)
-                print("[PlaybackManager] Smart Queue: Appended \(newTracks.count) new tracks.")
+                self.queue.append(contentsOf: finalTracks)
+                print("[PlaybackManager] Smart Queue: Appended \(finalTracks.count) new tracks.")
                 
                 // 4. Pre-Cache Upcoming
                 self.preCacheUpcomingTracks()
@@ -814,10 +881,26 @@ final class PlaybackManager: ObservableObject {
                     if seamlessPlaybackEnabled {
                         preloadNextTrack()
                     }
+                    
+                    // CRITICAL FIX: Trigger Smart Queue Update during Auto-Crossfade
+                    // (Previously this was only called in next(), causing queue starvation)
+                    if isInfiniteQueueEnabled {
+                        Task { await updateSmartQueue(for: nextTrack) }
+                    }
+                    
                 } catch {
                     print("[PlaybackManager] Auto-crossfade error: \(error)")
+                    // Fallback Safety:
+                    // Revert state so the current track can finish naturally (waiting for handleTrackEnd)
+                    queueIndex -= 1
+                    if queueIndex < 0 { queueIndex = 0 } // Safety
+                    
                     isTransitioning = false
-                    crossfadePending = false
+                    
+                    // Do NOT reset crossfadePending to false. Keep it true to prevent
+                    // the timer from retrying this failed crossfade every 0.1s.
+                    // We will just let the track finish and hit 'next()' normally.
+                    crossfadePending = true
                 }
             }
         }

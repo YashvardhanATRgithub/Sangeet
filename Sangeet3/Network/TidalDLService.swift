@@ -21,6 +21,7 @@ struct TidalTrack: Codable, Identifiable, Sendable {
     let artists: [TidalArtist]?
     let album: TidalAlbum
     let releaseDate: String? // Added for Era Matching
+    let popularity: Int? // Added for Search Ranking
     
     // Helper to get primary artist name
     var artistName: String {
@@ -72,13 +73,26 @@ actor TidalDLService {
     
     private let session: URLSession
     
+    // Fallback Servers
+    private let radioMirrors = [
+        "https://triton.squid.wtf", // Primary
+        "https://alpaca.qqdl.site",
+        "https://hund.qqdl.site",
+        "https://katze.qqdl.site",
+        "https://maus.qqdl.site",
+        "https://vogel.qqdl.site",
+        "https://wolf.qqdl.site"
+    ]
+    
     private init() {
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 30
+        config.timeoutIntervalForRequest = 10
+        config.timeoutIntervalForResource = 30
         // config.timeZone was invalid, removing it.
         config.httpAdditionalHeaders = [
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "application/json"
+            "Accept": "application/json",
+            "X-Client": "BiniLossless/2.0"
         ]
         self.session = URLSession(configuration: config)
     }
@@ -86,7 +100,7 @@ actor TidalDLService {
     // MARK: - Search
     
     func search(query: String) async throws -> [TidalTrack] {
-        var components = URLComponents(string: "https://tidal-api.binimum.org/search/")
+        var components = URLComponents(string: "https://triton.squid.wtf/search/")
         components?.queryItems = [URLQueryItem(name: "s", value: query)]
         
         guard let url = components?.url else { return [] }
@@ -105,8 +119,50 @@ actor TidalDLService {
         do {
             // Decode the wrapper first
             let wrapper = try JSONDecoder().decode(TidalResponse<TidalSearchData>.self, from: data)
-            print("[TidalService] Found \(wrapper.data.items.count) tracks")
-            return wrapper.data.items
+            let items = wrapper.data.items
+            
+            // Client-Side Reranking for Better Relevance
+            // "Gal Ban Gayee" should return the popular song first, not random covers.
+            
+            let queryLower = query.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            let rankedItems = items.sorted { t1, t2 in
+                let t1Title = t1.title.lowercased()
+                let t2Title = t2.title.lowercased()
+                
+                // 1. Exact/Prefix Match Priority
+                let t1Exact = t1Title == queryLower
+                let t2Exact = t2Title == queryLower
+                if t1Exact != t2Exact { return t1Exact }
+                
+                let t1Starts = t1Title.hasPrefix(queryLower)
+                let t2Starts = t2Title.hasPrefix(queryLower)
+                if t1Starts != t2Starts { return t1Starts }
+                
+                // 2. Popularity Priority (High Impact)
+                let p1 = t1.popularity ?? 0
+                let p2 = t2.popularity ?? 0
+                // Only consider popularity significantly if titles are somewhat equal in relevance
+                // But for "search", usually popularity is king if title contains query.
+                
+                let t1Contains = t1Title.contains(queryLower)
+                let t2Contains = t2Title.contains(queryLower)
+                
+                if t1Contains && t2Contains {
+                   // Both contain query, use Popularity
+                   return p1 > p2
+                }
+                
+                if t1Contains != t2Contains {
+                    return t1Contains
+                }
+                
+                // Fallback to popularity
+                return p1 > p2
+            }
+            
+            print("[TidalService] Found \(items.count) tracks, returning top \(rankedItems.count)")
+            return rankedItems
         } catch {
             print("[TidalService] Search Parse Error: \(error)")
             // Provide a fallback debug print of raw JSON if parsing fails
@@ -120,7 +176,7 @@ actor TidalDLService {
     // MARK: - Recommendations
     
     func getSimilarArtists(id: Int) async throws -> [TidalArtist] {
-        let urlString = "https://tidal-api.binimum.org/artist/similar/?id=\(id)&limit=5"
+        let urlString = "https://triton.squid.wtf/artist/similar/?id=\(id)&limit=5"
         guard let url = URL(string: urlString) else { return [] }
         
         print("[TidalService] Fetching Similar Artists: \(url.absoluteString)")
@@ -139,7 +195,7 @@ actor TidalDLService {
     
     func getStreamURL(trackID: Int, quality: TidalQuality = .LOSSLESS) async throws -> URL? {
         // Based on main.py: /track/?id=...&quality=... returns Tidal playbackinfo inside 'data'
-        let urlString = "https://tidal-api.binimum.org/track/?id=\(trackID)&quality=\(quality.rawValue)"
+        let urlString = "https://triton.squid.wtf/track/?id=\(trackID)&quality=\(quality.rawValue)"
         guard let url = URL(string: urlString) else { return nil }
         
         print("[TidalService] Fetching Stream: \(url.absoluteString)")
@@ -232,27 +288,30 @@ actor TidalDLService {
     // MARK: - Track Radio (Mix)
     
     func getTrackRadio(trackID: Int) async throws -> [TidalTrack] {
-        let urlString = "https://tidal-api.binimum.org/track/radio/?id=\(trackID)"
-        guard let url = URL(string: urlString) else { return [] }
-        
-        let (data, _) = try await session.data(from: url)
-        
-        // Tidal Mix Items response is usually a list of items
-        struct MixResponse: Codable {
-            let items: [MixItem]
+        // Try mirrors sequentially
+        for host in radioMirrors {
+            let urlString = "\(host)/track/radio/?id=\(trackID)"
+            guard let url = URL(string: urlString) else { continue }
+            
+            print("[TidalService] Fetching Radio from: \(host)...")
+            do {
+                let (data, response) = try await session.data(from: url)
+                if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+                    struct MixResponse: Codable {
+                        let items: [MixItem]
+                    }
+                    struct MixItem: Codable {
+                        let item: TidalTrack?
+                    }
+                    let decoded = try JSONDecoder().decode(MixResponse.self, from: data)
+                    let tracks = decoded.items.compactMap { $0.item }
+                    if !tracks.isEmpty { return tracks }
+                }
+            } catch {
+                print("[TidalService] Radio failed on \(host): \(error)")
+            }
         }
-        struct MixItem: Codable {
-            let item: TidalTrack?
-        }
-        
-        do {
-            let response = try JSONDecoder().decode(MixResponse.self, from: data)
-            return response.items.compactMap { $0.item }
-        } catch {
-            print("[TidalService] Track Radio Decode Error: \(error)")
-            // Fallback: Check if it's directly a list or wrapped differently
-            return []
-        }
+        return []
     }
         
 

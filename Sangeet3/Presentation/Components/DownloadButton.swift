@@ -61,14 +61,57 @@ struct DownloadButton: View {
     private func downloadAction() {
         guard !isDownloaded else { return }
         
-        // Search for the track on Tidal and download
+        // Strategy 1: Direct ID Download (Reliable)
+        if let idStr = track.externalID, let tidalID = Int(idStr) {
+             print("[DownloadButton] Direct Download via ID: \(tidalID)")
+            
+             Task {
+                 // Reconstruct Cover String from URL
+                 var coverID: String? = nil
+                 if let urlStr = track.artworkURL?.absoluteString {
+                     // Extract uuid parts from tidal url
+                     // Format: .../images/a/b/c/d/640x640.jpg
+                     // We want a-b-c-d
+                     let components = urlStr.components(separatedBy: "/")
+                     if components.count >= 5 {
+                         // Likely valid.
+                         // Find parts that look like hex dash hex...
+                         // Actually, simplistic approach:
+                         // Path contains /uuid-parts/resolution.jpg
+                         if let range = urlStr.range(of: "images/"), let end = urlStr.range(of: "/640x640") {
+                             let uuidPart = String(urlStr[range.upperBound..<end.lowerBound])
+                             coverID = uuidPart.replacingOccurrences(of: "/", with: "-")
+                         }
+                     }
+                 }
+                 
+                 let tidalTrack = TidalTrack(
+                     id: tidalID,
+                     title: track.title,
+                     duration: Int(track.duration),
+                     artist: TidalArtist(id: 0, name: track.artist),
+                     artists: nil,
+                     album: TidalAlbum(id: 0, title: track.album, cover: coverID),
+                     releaseDate: nil,
+                     popularity: nil
+                 )
+                 
+                 await MainActor.run {
+                     downloadManager.download(track: tidalTrack)
+                 }
+             }
+             return
+        }
+        
+        // Strategy 2: Fallback Search (Ambiguous)
         Task {
             // Create a TidalTrack-like object to pass to download manager
             // We need to search first to get the Tidal track ID
             let query = "\(track.title) \(track.artist)"
             do {
                 let results = try await TidalDLService.shared.search(query: query)
-                if let tidalTrack = results.first {
+                // Filter by title match to avoid "Shake It Off" vs "Lover" popularity trap
+                if let tidalTrack = results.first(where: { $0.title.lowercased().contains(track.title.lowercased()) }) ?? results.first {
                     await MainActor.run {
                         downloadManager.download(track: tidalTrack)
                     }

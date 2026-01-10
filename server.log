@@ -1,0 +1,6 @@
+INFO:     Started server process [63461]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:64945 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65005 - "GET /search/?s=test HTTP/1.1" 500 Internal Server Error

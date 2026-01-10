@@ -152,24 +152,7 @@ struct UniversalSongRow: View {
                 Label(isFavorite ? "Unfavorite" : "Favorite", systemImage: isFavorite ? "heart.slash" : "heart")
             }
             
-            Menu("Add to Playlist") {
-                if libraryManager.playlists.isEmpty {
-                    Button("No playlists - Create one first") { }
-                        .disabled(true)
-                } else {
-                    ForEach(libraryManager.playlists, id: \.id) { playlist in
-                        Button(playlist.name) {
-                            libraryManager.addTrackToPlaylist(track, playlist: playlist)
-                        }
-                    }
-                }
-                
-                Divider()
-                
-                Button("Create New Playlist...") {
-                    NotificationCenter.default.post(name: .createPlaylistRequested, object: track)
-                }
-            }
+            PlaylistSubMenu(track: track)
             
             Divider()
             Button("Add to Queue") { playbackManager.addToQueue(track) }
@@ -183,3 +166,65 @@ struct UniversalSongRow: View {
         }
     }
 }
+
+// MARK: - Subcomponents
+
+struct PlaylistSubMenu: View {
+    let track: Track
+    @EnvironmentObject var libraryManager: LibraryManager
+    @State private var playlistMembership: Set<String> = []
+    
+    var body: some View {
+        Menu("Add to Playlist") {
+            if libraryManager.playlists.isEmpty {
+                Button("No custom playlists") { }
+                    .disabled(true)
+            } else {
+                ForEach(libraryManager.playlists) { playlist in
+                    if playlistMembership.contains(playlist.id) {
+                        Button {
+                            removeTrack(from: playlist)
+                        } label: {
+                            Label("Remove from \(playlist.name)", systemImage: "checkmark")
+                        }
+                    } else {
+                        Button {
+                            addTrack(to: playlist)
+                        } label: {
+                            Text(playlist.name)
+                        }
+                    }
+                }
+            }
+            
+            Divider()
+            
+            Button("Create New Playlist...") {
+                NotificationCenter.default.post(name: .createPlaylistRequested, object: track)
+            }
+        }
+        .onAppear {
+            refreshMembership()
+        }
+    }
+    
+    private func refreshMembership() {
+        // Run on background logic but since this is UI state init, it's fast enough or we can task it
+        // Since getPlaylistIds is synchronous (blocking read), we should be careful. 
+        // But for a menu open it's okay. Ideally we use .task per SwiftUI 3.0+
+        
+        let ids = libraryManager.getPlaylistIds(for: track)
+        self.playlistMembership = ids
+    }
+    
+    private func addTrack(to playlist: PlaylistRecord) {
+        libraryManager.addTrackToPlaylist(track, playlist: playlist)
+        refreshMembership()
+    }
+    
+    private func removeTrack(from playlist: PlaylistRecord) {
+        libraryManager.removeTrackFromPlaylist(track, playlist: playlist)
+        refreshMembership()
+    }
+}
+

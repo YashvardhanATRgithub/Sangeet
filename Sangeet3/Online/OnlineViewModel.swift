@@ -39,19 +39,84 @@ class OnlineViewModel: ObservableObject {
     // MARK: - Actions
     
     func performSearch(_ query: String) async {
+        // 1. Network Check
+        guard NetworkMonitor.shared.isConnected else {
+            self.errorMessage = "No Internet Connection. Please check your network."
+            self.isLoading = false
+            return
+        }
+    
         isSearching = true
         isLoading = true
         errorMessage = nil
         
         do {
-            let results = try await tidalService.search(query: query)
+            var results = try await tidalService.search(query: query)
+            
+            // 2. Smart Lyrics Fallback
+            // If results are empty OR the query looks like lyrics (> 4 words), try iTunes Resolve
+            let isLongQuery = query.split(separator: " ").count >= 4
+            
+            if results.isEmpty || isLongQuery {
+                print("[OnlineVM] Attempting Smart Lyrics Resolve via iTunes...")
+                if let resolvedQuery = await resolveLyricsToSong(query) {
+                    print("[OnlineVM] Resolved Lyrics to: '\(resolvedQuery)'")
+                    // Search again with the Resolved Title
+                    let refinedResults = try await tidalService.search(query: resolvedQuery)
+                    if !refinedResults.isEmpty {
+                        // Merge: Put refined results AT THE TOP
+                        results.insert(contentsOf: refinedResults, at: 0)
+                        
+                        // Deduplicate by ID
+                        var seen = Set<Int>()
+                        results = results.filter { track in
+                            guard !seen.contains(track.id) else { return false }
+                            seen.insert(track.id)
+                            return true
+                        }
+                    }
+                }
+            }
+            
+            if results.isEmpty {
+                self.errorMessage = "No results found for '\(query)'."
+            }
             self.searchResults = results
         } catch {
-            self.errorMessage = "Search failed: \(error.localizedDescription)"
+            print("[OnlineVM] Search Error: \(error)")
+            self.errorMessage = "Unable to connect to server. Please try again later."
             self.searchResults = []
         }
         
         self.isLoading = false
+    }
+    
+    /// Helper: Uses iTunes API to resolve lyrics/random text to a proper Song Title + Artist
+    private func resolveLyricsToSong(_ text: String) async -> String? {
+        guard let encoded = text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "https://itunes.apple.com/search?term=\(encoded)&media=music&limit=1") else {
+            return nil
+        }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            // Reuse ITunes structure if possible, or simple local struct
+            struct ITunesResponse: Codable {
+                let results: [ITunesItem]
+            }
+            struct ITunesItem: Codable {
+                let trackName: String
+                let artistName: String
+            }
+            
+            let wrapper = try JSONDecoder().decode(ITunesResponse.self, from: data)
+            if let first = wrapper.results.first {
+                return "\(first.trackName) \(first.artistName)"
+            }
+        } catch {
+            print("[OnlineVM] iTunes Resolve Failed: \(error)")
+        }
+        return nil
     }
     
     func playTidalTrack(_ track: TidalTrack) {
@@ -82,7 +147,8 @@ class OnlineViewModel: ObservableObject {
                         duration: TimeInterval(track.duration),
                         fileURL: url,
                         artworkData: nil,
-                        artworkURL: track.coverURL
+                        artworkURL: track.coverURL,
+                        externalID: String(track.id)
                     )
                     
                     playbackManager.play(tempTrack)

@@ -64,6 +64,10 @@ struct TopTabBar: View {
             TopBarDownloadIndicator()
                 .padding(.trailing, 12)
             
+            // Metadata Indicator
+            TopBarMetadataIndicator()
+                .padding(.trailing, 12)
+            
             // Search Button
             Button(action: { withAnimation(.spring(response: 0.3)) { showSearch = true } }) {
                 Image(systemName: "magnifyingglass")

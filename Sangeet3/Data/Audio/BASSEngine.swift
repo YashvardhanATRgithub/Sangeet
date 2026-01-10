@@ -286,6 +286,8 @@ final class BASSEngine: ObservableObject {
     // MARK: - Playback
     
     func load(url: URL, onEnd: @escaping () -> Void) throws {
+        // Prevent spurious 'onTrackEnd' calls from the previous stream stopping
+        self.onTrackEnd = nil
         stop()
         self.onTrackEnd = onEnd
         

@@ -60,6 +60,7 @@
 		FFB00029 /* Presentation/Components/UniversalSongRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00029 /* Presentation/Components/UniversalSongRow.swift */; };
 		FFB00030 /* Presentation/Components/HeartButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00030 /* Presentation/Components/HeartButton.swift */; };
 		FFB00031 /* Presentation/Components/TopTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00031 /* Presentation/Components/TopTabBar.swift */; };
+		FFB00032 /* Presentation/Components/TopBarMetadataIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00032 /* Presentation/Components/TopBarMetadataIndicator.swift */; };
 		FFB00033 /* Presentation/Components/SwipeBackDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00033 /* Presentation/Components/SwipeBackDetector.swift */; };
 		FFB00034 /* Presentation/Components/LyricsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00034 /* Presentation/Components/LyricsView.swift */; };
 		FFB00035 /* Presentation/Components/QueueSidebar.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA00035 /* Presentation/Components/QueueSidebar.swift */; };
@@ -134,6 +135,7 @@
 		FFA00029 /* Presentation/Components/UniversalSongRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Components/UniversalSongRow.swift; sourceTree = "<group>"; };
 		FFA00030 /* Presentation/Components/HeartButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Components/HeartButton.swift; sourceTree = "<group>"; };
 		FFA00031 /* Presentation/Components/TopTabBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Components/TopTabBar.swift; sourceTree = "<group>"; };
+		FFA00032 /* Presentation/Components/TopBarMetadataIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Components/TopBarMetadataIndicator.swift; sourceTree = "<group>"; };
 		FFA00033 /* Presentation/Components/SwipeBackDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Components/SwipeBackDetector.swift; sourceTree = "<group>"; };
 		FFA00034 /* Presentation/Components/LyricsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Components/LyricsView.swift; sourceTree = "<group>"; };
 		FFA00035 /* Presentation/Components/QueueSidebar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Components/QueueSidebar.swift; sourceTree = "<group>"; };
@@ -388,6 +390,7 @@
 				FFB00029 /* Presentation/Components/UniversalSongRow.swift in Sources */,
 				FFB00030 /* Presentation/Components/HeartButton.swift in Sources */,
 				FFB00031 /* Presentation/Components/TopTabBar.swift in Sources */,
+				FFB00032 /* Presentation/Components/TopBarMetadataIndicator.swift in Sources */,
 				FFB00042 /* Presentation/Components/EqualizerView.swift in Sources */,
 				FFB00033 /* Presentation/Components/SwipeBackDetector.swift in Sources */,
 				FFB00034 /* Presentation/Components/LyricsView.swift in Sources */,

@@ -147,13 +147,27 @@ final class LibraryManager: ObservableObject {
     }
     
     private func sanitizeString(_ str: String) -> String {
-        return str.lowercased()
-            .replacingOccurrences(of: "(feat.*)", with: "", options: .regularExpression)
-            .replacingOccurrences(of: "\\[feat.*\\]", with: "", options: .regularExpression)
-            .replacingOccurrences(of: "\\(remaster.*\\)", with: "", options: .regularExpression)
-            .replacingOccurrences(of: "the ", with: "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .filter { $0.isLetter || $0.isNumber } // Remove punctuation
+        var s = str.lowercased()
+        
+        // Remove parens and brackets: "Song (From X)" -> "Song "
+        s = s.replacingOccurrences(of: "\\(.*?\\)", with: "", options: .regularExpression)
+        s = s.replacingOccurrences(of: "\\[.*?\\]", with: "", options: .regularExpression)
+        
+        // Remove common suffixes often found in titles
+        // "Song feat. X", "Song from X", "Song Remix", "Song Version"
+        // Note: We use a loop or multiple replacements to catch them all.
+        // The regex ` (feat\\.|from|track|remix|version).*` is good but might miss edge cases.
+        s = s.replacingOccurrences(of: " feat\\..*", with: "", options: .regularExpression)
+        s = s.replacingOccurrences(of: " from .*", with: "", options: .regularExpression)
+        s = s.replacingOccurrences(of: " remix.*", with: "", options: .regularExpression)
+        s = s.replacingOccurrences(of: " version.*", with: "", options: .regularExpression)
+        s = s.replacingOccurrences(of: "the ", with: "")
+        
+        // Remove non-alphanumeric (keep spaces for splitting?) No, simple filter is better.
+        // "Aayi Nai" -> "aayinai"
+        let alphanum = s.filter { $0.isLetter || $0.isNumber }
+        
+        return alphanum.isEmpty ? s : alphanum
     }
     
     func addFolder() {
@@ -176,6 +190,31 @@ final class LibraryManager: ObservableObject {
                 }
             }
         }
+    }
+    
+    // Create default ~/Music/Sangeet folder
+    func createDefaultFolder() async -> URL? {
+        // 1. Get Music Directory
+        guard let musicDir = FileManager.default.urls(for: .musicDirectory, in: .userDomainMask).first else { return nil }
+        
+        let target = musicDir.appendingPathComponent("Sangeet")
+        
+        // 2. Create if needed
+        if !FileManager.default.fileExists(atPath: target.path) {
+            do {
+                try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
+            } catch {
+                print("[LibraryManager] Failed to create default folder: \(error)")
+                return nil
+            }
+        }
+        
+        // 3. Register
+        if !folders.contains(target) {
+            await addFolder(url: target)
+        }
+        
+        return target
     }
     
     // Expose programmatic add folder
@@ -487,6 +526,13 @@ final class LibraryManager: ObservableObject {
         if let index = tracks.firstIndex(where: { $0.id == track.id }) {
             tracks[index].isFavorite.toggle()
             
+            // Recommendation Engine Hook
+            if tracks[index].isFavorite {
+                RecommendationEngine.shared.recordInteraction(for: track, type: .liked)
+            } else {
+                RecommendationEngine.shared.recordInteraction(for: track, type: .unliked)
+            }
+            
             // Update in database
             DatabaseManager.shared.writeAsync { db in
                 let record = TrackRecord(from: self.tracks[index])
@@ -494,6 +540,8 @@ final class LibraryManager: ObservableObject {
             }
         }
     }
+    
+
     
     func incrementPlayCount(_ track: Track) {
         if let index = tracks.firstIndex(where: { $0.id == track.id }) {
@@ -600,7 +648,15 @@ final class LibraryManager: ObservableObject {
         Task {
             do {
                 _ = try DatabaseManager.shared.write { db in
-                    // Check if track already exists in playlist
+                    // 1. Ensure Track exists in DB (especially for Remote tracks)
+                    // If it's a Tidal track, it might not be in our DB yet.
+                    let trackRecord = TrackRecord(from: track)
+                    // Use upsert mechanism (insert or replace)
+                    if try TrackRecord.filter(Column("id") == track.id.uuidString).fetchCount(db) == 0 {
+                        try trackRecord.insert(db)
+                    }
+                    
+                    // 2. Check if track already exists in playlist
                     let existing = try PlaylistTrackRecord
                         .filter(Column("playlistId") == playlist.id)
                         .filter(Column("trackId") == track.id.uuidString)
@@ -611,7 +667,7 @@ final class LibraryManager: ObservableObject {
                         return
                     }
                     
-                    // Get max position
+                    // 3. Get max position
                     let count = try PlaylistTrackRecord
                         .filter(Column("playlistId") == playlist.id)
                         .fetchCount(db)
@@ -629,7 +685,10 @@ final class LibraryManager: ObservableObject {
                 // Notify UI to refresh
                 await MainActor.run {
                     NotificationCenter.default.post(name: .playlistUpdated, object: playlist.id)
-                    self.objectWillChange.send() // Force UI update for track counts
+                    // We must also refresh the main tracks list if we added a new remote track?
+                    // No, generally we only show local tracks in "Library", but playlists can have remote.
+                    // But we likely need to reload the specific playlist view.
+                    self.objectWillChange.send()
                 }
             } catch {
                 print("[LibraryManager] Add to playlist error: \(error)")
@@ -661,28 +720,33 @@ final class LibraryManager: ObservableObject {
     
     // MARK: - Smart Queue Recommendations
     
-    // MARK: - Smart Queue Recommendations
-    
-    /// Fast: Returns top tracks for the seed artist immediately (1 network call)
-    func getFastRecommendations(for seedTrack: Track) async -> [Track] {
+    /// Fast: Returns top tracks for the seed artist immediately
+    /// excludeTracks: List of tracks to strictly exclude (e.g. current queue + detailed history)
+    func getFastRecommendations(for seedTrack: Track, exclude: [Track] = []) async -> [Track] {
         print("[LibraryManager] Smart Queue (Fast): Fetching Top Tracks for '\(seedTrack.artist)'")
         do {
-            // Fix: Search for ARTIST only to get top tracks, not variations of the current song
             let query = seedTrack.artist
             let results = try await TidalDLService.shared.search(query: query)
             
-            // Filter: Exclude current song and its variations (e.g. "Wedding Version")
-            let lowTitle = seedTrack.title.lowercased()
+            // Build exclusion set (Titles lowercased)
+            let excludedTitles = Set(exclude.map { sanitizeString($0.title) })
+            let seedTitle = sanitizeString(seedTrack.title)
+            
             let filtered = results.filter { candidate in
-                let candTitle = candidate.title.lowercased()
-                // Standard check: exact match
-                if candTitle == lowTitle { return false }
-                // Fuzzy check: if candidate title contains seed title (e.g. "Ordinary" inside "Ordinary (Wedding)") -> Skip
-                if candTitle.contains(lowTitle) { return false }
+                let candTitle = sanitizeString(candidate.title)
+                
+                // 1. Strict Self Exclusion
+                if candTitle == seedTitle { return false }
+                if candTitle.contains(seedTitle) || seedTitle.contains(candTitle) { return false }
+                
+                // 2. Queue Exclusion
+                if excludedTitles.contains(candTitle) { return false }
+                
                 return true
             }
             
-            return resolveTracks(Array(filtered.prefix(2)))
+            // Increased to 5
+            return resolveTracks(Array(filtered.prefix(5)))
         } catch {
             print("[LibraryManager] Smart Queue (Fast) Error: \(error)")
             return []
@@ -690,113 +754,198 @@ final class LibraryManager: ObservableObject {
     }
     
     /// Deep: Returns a mix of Track Radio (Mood/Genre) OR Similar Artists
-    func getDeepRecommendations(for seedTrack: Track) async -> [Track] {
+    func getDeepRecommendations(for seedTrack: Track, exclude: [Track] = []) async -> [Track] {
         print("[LibraryManager] Smart Queue (Deep): Generating mix for '\(seedTrack.title)'")
         
-        // 1. Try Track Radio (Best for Mood/Genre)
+        let excludedTitles = Set(exclude.map { sanitizeString($0.title) })
+        let seedTitle = sanitizeString(seedTrack.title)
+        
+        // Helper to filter and deduplicate
+        let filterCandidates: ([TidalTrack]) -> [TidalTrack] = { candidates in
+            var seen = Set<String>()
+            return candidates.filter { candidate in
+                let candTitle = self.sanitizeString(candidate.title)
+                
+                // 1. Check against Seed and Excludes
+                if candTitle == seedTitle { return false }
+                if candTitle.contains(seedTitle) || seedTitle.contains(candTitle) { return false }
+                if excludedTitles.contains(candTitle) { return false }
+                
+                // 2. Check internal duplicates (e.g. "Song" vs "Song (OST)")
+                if seen.contains(candTitle) { return false }
+                seen.insert(candTitle)
+                
+                return true
+            }
+        }
+        
+        var rawCandidates: [Track] = []
+        
+        // 1. Try Track Radio
         if seedTrack.isRemote, let seedID = Int(seedTrack.fileURL.host ?? "") {
              do {
                  let radioTracks = try await TidalDLService.shared.getTrackRadio(trackID: seedID)
-                 if !radioTracks.isEmpty {
-                     print("[LibraryManager] Smart Queue (Deep): Using Track Radio (Context/Mood Matched: \(radioTracks.count))")
-                     // Filter duplicates and current song
-                     let unique = radioTracks.filter { $0.title != seedTrack.title }
+                 
+                 // VARIETY CHECK:
+                 // If Track Radio is dominated by the same artist, we MUST mix in Similar Artists.
+                 let uniqueRadio = filterCandidates(radioTracks)
+                 let seedArtistNorm = sanitizeString(seedTrack.artist)
+                 
+                 let sameArtistCount = uniqueRadio.filter { sanitizeString($0.artistName) == seedArtistNorm }.count
+                 let varietyRatio = Double(sameArtistCount) / Double(max(1, uniqueRadio.count))
+                 
+                 if !radioTracks.isEmpty && varietyRatio < 0.4 {
+                     // Good Variety: Use Radio directly
+                     print("[LibraryManager] Smart Queue (Deep): Using Track Radio (Values: \(radioTracks.count), Variety: \(1.0 - varietyRatio))")
+                     rawCandidates = resolveTracks(Array(uniqueRadio.prefix(25)))
+                 } else {
+                     // Low Variety or Empty: We need to mix in Similar Artists
+                     print("[LibraryManager] Smart Queue (Deep): Track Radio too homogenous (\(Int(varietyRatio * 100))% same artist). Mixing in Similar Artists.")
                      
-                     // We still apply Era Matching to the Radio results just to be sure, or trust Tidal?
-                     // Trust Tidal for Mixes.
-                     return resolveTracks(Array(unique.prefix(15)))
+                     // Keep some radio tracks (Max 3 from seed artist)
+                     // Low Variety or Empty: We need to mix in Similar Artists
+                     print("[LibraryManager] Smart Queue (Deep): Track Radio too homogenous (\(Int(varietyRatio * 100))% same artist). Mixing in Similar Artists.")
+                     
+                     // Keep more radio tracks as backup (Max 10 from seed artist)
+                     let radioFiltered = uniqueRadio.filter { sanitizeString($0.artistName) != seedArtistNorm }
+                     let radioSame = uniqueRadio.filter { sanitizeString($0.artistName) == seedArtistNorm }.prefix(10)
+                     
+                     rawCandidates = resolveTracks(Array(radioFiltered + radioSame))
                  }
              } catch {
-                 print("[LibraryManager] Smart Queue (Deep): Track Radio not available (\(error)), falling back to Similar Artists.")
+                 print("[LibraryManager] Smart Queue (Deep): Track Radio unavailable.")
              }
         }
         
-        // 2. Fallback: Similar Artists (Legacy Logic)
-        do {
-            // Re-fetch seed to get ID (or optimize)
-            let query = "\(seedTrack.title) \(seedTrack.artist)"
-            let searchResults = try await TidalDLService.shared.search(query: query)
-            
-            guard let seedTidalTrack = searchResults.first else { return [] }
-            guard let artistID = seedTidalTrack.artist?.id ?? seedTidalTrack.artists?.first?.id else { return [] }
-            
-            // Fetch Similar Artists
-            let similarArtists = try await TidalDLService.shared.getSimilarArtists(id: artistID)
-            var candidates: [TidalTrack] = []
-            
-            // Fetch Top Tracks for Similar Artists (Parallel)
-            await withTaskGroup(of: [TidalTrack].self) { group in
-                for artist in similarArtists.prefix(4) {
-                    group.addTask {
-                        do {
-                            let tracks = try await TidalDLService.shared.search(query: artist.name)
-                            return Array(tracks.prefix(3))
-                        } catch {
-                            return []
+        let radioBackup = rawCandidates // Store what we found from Radio for fallback
+        
+        // 2. Similar Artists Injection (If needed)
+        // If we have < 10 candidates after Radio, or if we ignored Radio due to low variety
+        if rawCandidates.count < 15 {
+            do {
+                // Get Artist ID
+                var artistID: Int?
+                if seedTrack.isRemote, let t = try? await TidalDLService.shared.search(query: "\(seedTrack.title) \(seedTrack.artist)").first {
+                     artistID = t.artist?.id ?? t.artists?.first?.id
+                } else if let t = try? await TidalDLService.shared.search(query: seedTrack.artist).first {
+                    artistID = t.artist?.id ?? t.artists?.first?.id
+                }
+                
+                if let id = artistID {
+                    let similarArtists = try await TidalDLService.shared.getSimilarArtists(id: id)
+                    
+                    var similarCandidates: [TidalTrack] = []
+                    
+                    await withTaskGroup(of: [TidalTrack].self) { group in
+                        for artist in similarArtists.prefix(7) { 
+                             group.addTask {
+                                do {
+                                    // Fetch top tracks for this similar artist
+                                    let tracks = try await TidalDLService.shared.search(query: artist.name)
+                                    return Array(tracks.prefix(3))
+                                } catch { return [] }
+                            }
+                        }
+                        
+                        for await tracks in group {
+                            similarCandidates.append(contentsOf: tracks)
+                        }
+                    }
+                    
+                    if !similarCandidates.isEmpty {
+                         let uniqueSimilar = filterCandidates(similarCandidates)
+                         let resolvedSimilar = resolveTracks(uniqueSimilar)
+                         
+                         // Merge
+                         if rawCandidates.isEmpty {
+                             rawCandidates = resolvedSimilar
+                         } else {
+                             // Interleave / Append
+                             rawCandidates.append(contentsOf: resolvedSimilar)
+                         }
+                    } else {
+                        // Similar Artists returned empty (Maybe API issue)
+                        // If we aggressively filtered Radio earlier, RESTORE IT!
+                        if rawCandidates.count < 5, let radioTracks = try? await TidalDLService.shared.getTrackRadio(trackID: Int(seedTrack.fileURL.host ?? "") ?? 0) {
+                            print("[LibraryManager] Similar Artists failed. Restoring original Track Radio.")
+                            let unique = filterCandidates(radioTracks)
+                            rawCandidates = resolveTracks(Array(unique.prefix(25)))
                         }
                     }
                 }
-                
-                for await tracks in group {
-                    candidates.append(contentsOf: tracks)
-                }
+            } catch {
+                 print("[LibraryManager] Similar Artists fallback failed: \(error)")
+                 // Restore Backup if needed
+                 if rawCandidates.count < 5 && radioBackup.count > rawCandidates.count {
+                      rawCandidates = radioBackup
+                 }
             }
-            
-            // Remove duplicates and shuffle
-            let uniqueCandidates = Array(Set(candidates.map { $0.id })).compactMap { id in
-                candidates.first(where: { $0.id == id })
-            }
-            
-            // Filter by Release Year (Era Matching)
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "yyyy-MM-dd"
-            let seedDate = seedTidalTrack.releaseDate.flatMap { dateFormatter.date(from: $0) }
-            let seedYear = seedDate.map { Calendar.current.component(.year, from: $0) }
-            
-            let eraFiltered = uniqueCandidates.filter { track in
-                guard let seedY = seedYear, 
-                      let trackDateStr = track.releaseDate, 
-                      let date = dateFormatter.date(from: trackDateStr) else {
-                    return true 
-                }
-                let trackYear = Calendar.current.component(.year, from: date)
-                return abs(trackYear - seedY) <= 5
-            }
-            
-            let candidatesToUse = eraFiltered.count > 5 ? eraFiltered : uniqueCandidates
-            let selection = candidatesToUse.shuffled().prefix(15)
-            
-            print("[LibraryManager] Smart Queue (Deep): Found \(selection.count) candidates (Similar + Era).")
-            return resolveTracks(Array(selection))
-            
-        } catch {
-             print("[LibraryManager] Smart Queue (Deep) Error: \(error). Falling back to Offline Shuffle.")
-             // 3. Offline Fallback
-             let localTracks = self.tracks
-             guard !localTracks.isEmpty else { return [] }
-             return Array(localTracks.shuffled().prefix(10))
         }
+        
+        // 3. Final Shuffle & Recommendations
+        if !rawCandidates.isEmpty {
+            // Shuffle to mix Radio vs Similar
+            rawCandidates.shuffle()
+            
+            // Apply Recommendation Engine Ranking
+            print("[LibraryManager] Ranking \(rawCandidates.count) candidates with Recommendation Engine...")
+            // We request rank, but engine might prioritize "Liked" artists.
+            let ranked = await RecommendationEngine.shared.rank(candidates: rawCandidates)
+            
+            // 4. Final Variety Enforcer (Post-Ranking)
+            // Ensure no more than 3 songs from Seed Artist appear in total.
+            let seedArtistNorm = sanitizeString(seedTrack.artist)
+            
+            // Soft Limit: Try to limit to 4. If total < 5, allow more.
+            var seedCount = 0
+            var filtered: [Track] = []
+            
+            // First pass: Add non-seed songs and up to 4 seed songs
+            for t in ranked {
+                if sanitizeString(t.artist) == seedArtistNorm {
+                    seedCount += 1
+                    if seedCount > 4 { continue }
+                }
+                filtered.append(t)
+            }
+            
+            // Emergency Check: If we filtered too much and have < 5 songs, put them back!
+            if filtered.count < 5 {
+                let currentIDs = Set(filtered.map { $0.id })
+                for t in ranked {
+                    if !currentIDs.contains(t.id) {
+                        filtered.append(t)
+                        if filtered.count >= 10 { break }
+                    }
+                }
+            }
+            
+            return filtered
+        }
+        
+        return []
     }
     
-    // Check for Era Matching:
-    // Helper used inside the closure above
-    // private func getYear(...) - Not needed, we use inline Calendar.current.component
-
-    
+    // Deterministic UUID generation
     private func resolveTracks(_ tidalTracks: [TidalTrack]) -> [Track] {
         var references: [Track] = []
         for tidalTrack in tidalTracks {
             if let localTrack = findLocalTrack(title: tidalTrack.title, artist: tidalTrack.artistName) {
                 references.append(localTrack)
             } else {
+                // Generate Deterministic UUID based on Tidal ID
+                // UUID from string hash is reliable for duplicates
+                let uuidString = UUID(uuidString: "00000000-0000-0000-0000-\(String(format: "%012d", tidalTrack.id))") ?? UUID()
+                
                 references.append(Track(
-                    id: UUID(),
+                    id: uuidString,
                     title: tidalTrack.title,
                     artist: tidalTrack.artistName,
                     album: tidalTrack.albumName,
                     duration: TimeInterval(tidalTrack.duration),
                     fileURL: URL(string: "tidal://\(tidalTrack.id)")!,
-                    artworkURL: tidalTrack.coverURL
+                    artworkURL: tidalTrack.coverURL,
+                    externalID: String(tidalTrack.id)
                 ))
             }
         }
@@ -858,6 +1007,39 @@ final class LibraryManager: ObservableObject {
         } catch {
             return 0
         }
+    }
+    
+    /// Check which playlists a track belongs to
+    func getPlaylistIds(for track: Track) -> Set<String> {
+        do {
+            let ids = try DatabaseManager.shared.read { db in
+                try PlaylistTrackRecord
+                    .filter(Column("trackId") == track.id.uuidString)
+                    .fetchAll(db)
+                    .map { $0.playlistId }
+            }
+            return Set(ids)
+        } catch {
+            print("[LibraryManager] Failed to get playlist IDs for track: \(error)")
+            return []
+        }
+    }
+
+    func removeTrackFromPlaylist(_ track: Track, playlist: PlaylistRecord) {
+        DatabaseManager.shared.writeAsync { db in
+            try PlaylistTrackRecord
+                .filter(Column("playlistId") == playlist.id && Column("trackId") == track.id.uuidString)
+                .deleteAll(db)
+        }
+        
+        // Update modified date
+        DatabaseManager.shared.writeAsync { db in
+            var p = playlist
+            p.dateModified = Date()
+            try p.save(db)
+        }
+        
+        print("[LibraryManager] Removed '\(track.title)' from playlist '\(playlist.name)'")
     }
     
     // MARK: - Trending / Top Songs
@@ -1065,4 +1247,84 @@ private struct ITunesEntry: Codable {
 
 private struct ITunesLabel: Codable {
     let label: String
+}
+
+
+
+// MARK: - Recommendation Engine
+
+enum UserInteractionType {
+    case liked
+    case unliked
+    case playedFully
+    case skippedImmediate // < 10s
+    case skippedEarly     // < 30s
+}
+
+/// A local "Lightweight" ML Engine that ranks tracks based on User Affinity.
+class RecommendationEngine {
+    static let shared = RecommendationEngine()
+    
+    struct TasteProfile: Codable {
+        /// Artist Name -> Affinity Score (Higher is better)
+        var artistScores: [String: Double] = [:]
+    }
+    
+    private var profile: TasteProfile
+    private let queue = DispatchQueue(label: "com.sangeet.recommendation", qos: .background)
+    
+    private init() {
+        if let data = UserDefaults.standard.data(forKey: "userTasteProfile"),
+           let decoded = try? JSONDecoder().decode(TasteProfile.self, from: data) {
+            self.profile = decoded
+        } else {
+            self.profile = TasteProfile()
+        }
+    }
+    
+    func recordInteraction(for track: Track, type: UserInteractionType) {
+        queue.async {
+            self.updateScore(for: track.artist, type: type)
+            self.saveProfile()
+        }
+    }
+    
+    func rank(candidates: [Track]) async -> [Track] {
+        let currentProfile = self.profile
+        return candidates.sorted { trackA, trackB in
+            let scoreA = self.calculateScore(for: trackA, profile: currentProfile)
+            let scoreB = self.calculateScore(for: trackB, profile: currentProfile)
+            return scoreA > scoreB
+        }
+    }
+    
+    private func updateScore(for artist: String, type: UserInteractionType) {
+        let key = artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        var current = profile.artistScores[key] ?? 0.0
+        
+        switch type {
+        case .liked: current += 5.0
+        case .unliked: current -= 5.0
+        case .playedFully: current += 1.0
+        case .skippedImmediate: current -= 3.0
+        case .skippedEarly: current -= 1.0
+        }
+        
+        current = max(-20.0, min(50.0, current))
+        profile.artistScores[key] = current
+        print("[RecommendationEngine] Updated score for '\(artist)': \(current)")
+    }
+    
+    private func calculateScore(for track: Track, profile: TasteProfile) -> Double {
+        let key = track.artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let affinity = profile.artistScores[key] ?? 0.0
+        let noise = Double.random(in: 0...0.1)
+        return affinity + noise
+    }
+    
+    private func saveProfile() {
+        if let encoded = try? JSONEncoder().encode(profile) {
+            UserDefaults.standard.set(encoded, forKey: "userTasteProfile")
+        }
+    }
 }

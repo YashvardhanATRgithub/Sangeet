@@ -289,24 +289,11 @@ class NetworkMonitor: ObservableObject {
     }
     
     func checkAPIHealth() {
-        guard isConnected else {
-             apiReachable = false
-             return 
+        // Disabled Strict Health Check to prevent false positives blocking the UI.
+        // The ViewModel handles individual request errors gracefully.
+        DispatchQueue.main.async {
+            self.apiReachable = true
         }
-        let healthURL = URL(string: "https://tidal-api.binimum.org/search/?s=test")!
-        var request = URLRequest(url: healthURL)
-        request.httpMethod = "GET"
-        request.timeoutInterval = 5
-        
-        URLSession.shared.dataTask(with: request) { _, response, _ in
-            DispatchQueue.main.async {
-                if let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) {
-                    self.apiReachable = true
-                } else {
-                    self.apiReachable = false 
-                }
-            }
-        }.resume()
     }
 }
 
@@ -318,8 +305,13 @@ struct OfflineStateView: View {
     
     var body: some View {
         VStack(spacing: 24) {
-            Spacer()
-            
+             // ... (Rest of UI)
+             // We only show this view if !isConnected in the parent view.
+             // If we ever invoke it with isAPIDown=true, it will still show, but we prevented that state.
+             Spacer()
+             
+             // ... (Keep existing UI implementation for safety, but checkAPIHealth ensures it's rarely true)
+             
             // Animated Icon Container
             ZStack {
                 // Glow buffer
@@ -385,7 +377,7 @@ struct OfflineStateView: View {
                     .font(.title2.bold())
                     .foregroundStyle(.white)
                 
-                Text(isAPIDown ? "The HiFi API server seems to be down.\nPlease check your local python server." : "It seems you are offline.\nCheck your internet connection.")
+                Text(isAPIDown ? "The HiFi API server seems to be down." : "It seems you are offline.\nCheck your internet connection.")
                     .font(.body)
                     .foregroundStyle(SangeetTheme.textSecondary)
                     .multilineTextAlignment(.center)

@@ -226,7 +226,17 @@ struct LibrarySettingsSheet: View {
             }
             .frame(height: 200)
             
-            Button("Add Folder") { libraryManager.addFolder() }
+            HStack {
+                Button("Add Folder") { libraryManager.addFolder() }
+                
+                // New Default Folder Button
+                Button(action: {
+                    Task { _ = await libraryManager.createDefaultFolder() }
+                }) {
+                    Text("Create Default")
+                        .foregroundStyle(SangeetTheme.primary)
+                }
+            }
             Button("Done") { dismiss() }
         }
         .padding()
@@ -246,12 +256,21 @@ struct MetadataSettingsSheet: View {
                 .multilineTextAlignment(.center)
             
             if metadataManager.isBulkFixing {
-                ProgressView(value: Double(metadataManager.processedCount), total: Double(metadataManager.totalCount))
-                Text("\(metadataManager.processedCount) / \(metadataManager.totalCount)")
+                // If already running, show status but user can close sheet and watch top bar
+                Text("Scan in progress... Check the top bar.")
+                    .foregroundStyle(.secondary)
+                ProgressView()
+                    .padding(.bottom, 10)
             } else {
                 Button("Start Auto-Tagging") {
-                    Task { await metadataManager.fixAllMetadata(libraryManager: libraryManager) }
+                    Task {
+                        dismiss() // Close sheet immediately
+                        // Give explicit delay to allow sheet to close before heaviness
+                        try? await Task.sleep(nanoseconds: 500_000_000)
+                        await metadataManager.fixAllMetadata(libraryManager: libraryManager)
+                    }
                 }
+                .buttonStyle(.borderedProminent)
             }
             Button("Done") { dismiss() }
         }

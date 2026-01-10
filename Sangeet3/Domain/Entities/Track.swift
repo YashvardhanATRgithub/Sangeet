@@ -33,8 +33,10 @@ struct Track: Identifiable, Hashable {
         return scheme == "http" || scheme == "https" || scheme == "tidal"
     }
     
-    init(id: UUID = UUID(), title: String, artist: String = "Unknown Artist", album: String = "Unknown Album", duration: TimeInterval = 0, fileURL: URL, artworkData: Data? = nil, artworkURL: URL? = nil, isFavorite: Bool = false, playCount: Int = 0, lastPlayed: Date? = nil, dateAdded: Date = Date()) {
-        self.id = id; self.title = title; self.artist = artist; self.album = album; self.duration = duration; self.fileURL = fileURL; self.artworkData = artworkData; self.artworkURL = artworkURL; self.isFavorite = isFavorite; self.playCount = playCount; self.lastPlayed = lastPlayed; self.dateAdded = dateAdded
+    var externalID: String? // For reliable identification (e.g. Tidal ID)
+    
+    init(id: UUID = UUID(), title: String, artist: String = "Unknown Artist", album: String = "Unknown Album", duration: TimeInterval = 0, fileURL: URL, artworkData: Data? = nil, artworkURL: URL? = nil, isFavorite: Bool = false, playCount: Int = 0, lastPlayed: Date? = nil, dateAdded: Date = Date(), externalID: String? = nil) {
+        self.id = id; self.title = title; self.artist = artist; self.album = album; self.duration = duration; self.fileURL = fileURL; self.artworkData = artworkData; self.artworkURL = artworkURL; self.isFavorite = isFavorite; self.playCount = playCount; self.lastPlayed = lastPlayed; self.dateAdded = dateAdded; self.externalID = externalID
     }
     
     func hash(into hasher: inout Hasher) {
