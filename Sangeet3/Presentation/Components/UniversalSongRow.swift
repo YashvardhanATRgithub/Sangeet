@@ -10,6 +10,8 @@ import SwiftUI
 struct UniversalSongRow: View {
     let track: Track
     @Binding var selectedTrack: Track?
+    var queueContext: [Track]? = nil // Optional playback context
+    
     @EnvironmentObject var playbackManager: PlaybackManager
     @EnvironmentObject var libraryManager: LibraryManager
     @State private var isHovering = false
@@ -134,22 +136,27 @@ struct UniversalSongRow: View {
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .contentShape(Rectangle())
         .onHover { isHovering = $0 }
-        .onTapGesture {
-            // Single Tap Plays Immediately
-            if let index = libraryManager.tracks.firstIndex(of: track) {
-                playbackManager.playQueue(tracks: libraryManager.tracks, startIndex: index)
-                selectedTrack = track
-            } else {
-                // Fallback for isolated tracks (e.g. from search results outside main list)
-                playbackManager.playQueue(tracks: [track], startIndex: 0)
-                selectedTrack = track
-            }
-        }
-        // Use reliable NSViewRepresentable to capture right clicks
+        // Use reliable NSViewRepresentable to capture right clicks AND left clicks
         .overlay(
-            RightClickableSwiftUIView {
-                showNSContextMenu(for: track, isFavorite: isFavorite)
-            }
+            RightClickableSwiftUIView(
+                onRightClick: {
+                    showNSContextMenu(for: track, isFavorite: isFavorite)
+                },
+                onLeftClick: {
+                    // Logic:
+                    // If queueContext is provided (e.g. Album/Playlist), play that list.
+                    // If queueContext is NIL (Generic Library), trigger Smart Queue (Play via Context Switch).
+                    
+                    if let context = queueContext, let index = context.firstIndex(of: track) {
+                        // Play Explicit Context (Album, Playlist, Artist)
+                        playbackManager.playQueue(tracks: context, startIndex: index)
+                    } else {
+                        // Play Single Track -> Triggers Smart Queue logic in PlaybackManager
+                        playbackManager.startRadio(from: track)
+                    }
+                    selectedTrack = track
+                }
+            )
         )
     }
     
@@ -243,42 +250,42 @@ struct UniversalSongRow: View {
 // MARK: - Right Click Overlay
 struct RightClickableSwiftUIView: NSViewRepresentable {
     let onRightClick: () -> Void
+    let onLeftClick: (() -> Void)?
+    
+    init(onRightClick: @escaping () -> Void, onLeftClick: (() -> Void)? = nil) {
+        self.onRightClick = onRightClick
+        self.onLeftClick = onLeftClick
+    }
     
     func makeNSView(context: Context) -> RightClickView {
         let view = RightClickView()
         view.onRightClick = onRightClick
+        view.onLeftClick = onLeftClick
         return view
     }
     
     func updateNSView(_ nsView: RightClickView, context: Context) {
         nsView.onRightClick = onRightClick
+        nsView.onLeftClick = onLeftClick
     }
     
     class RightClickView: NSView {
         var onRightClick: (() -> Void)?
+        var onLeftClick: (() -> Void)?
         
         override func mouseDown(with event: NSEvent) {
-            // Passthrough left clicks to SwiftUI
-            super.mouseDown(with: event)
-            if let window = self.window {
-                window.makeFirstResponder(self)
+            // Trigger left click action if provided
+            if let onLeftClick = onLeftClick {
+                onLeftClick()
+            } else {
+                // If no action, try to pass through (though overlay usually blocks)
+                super.mouseDown(with: event)
+                self.nextResponder?.mouseDown(with: event)
             }
         }
         
         override func rightMouseDown(with event: NSEvent) {
             onRightClick?()
-        }
-        
-        // Ensure the view is transparent and hit-testable
-        override func hitTest(_ point: NSPoint) -> NSView? {
-            // We want to capture right clicks, but let left clicks pass through?
-            // Actually, for rightMouseDown to trigger, we must be hit.
-            // But if we return self, we block SwiftUI buttons below us for left click.
-            // Solution: Return self, but forward mouseDown?
-            // No, SwiftUI gestures are tricky.
-            // Better: Return nil for left click events? hitTest doesn't know the event.
-            // Standard approach: Return self. Forward mouseDown to nextResponder.
-            return super.hitTest(point)
         }
     }
 }

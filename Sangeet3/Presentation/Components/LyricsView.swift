@@ -72,7 +72,8 @@ struct LyricsView: View {
                         LyricLine(
                             line: line,
                             isActive: viewModel.currentLineIndex == index,
-                            isPast: index < viewModel.currentLineIndex
+                            isPast: index < viewModel.currentLineIndex,
+                            currentTime: playbackManager.currentTime
                         )
                         .id(line.id)
                     }
@@ -83,7 +84,8 @@ struct LyricsView: View {
             }
             .onChange(of: viewModel.currentLineIndex) { _, newIndex in
                 guard newIndex >= 0 && newIndex < viewModel.lyrics.count else { return }
-                withAnimation(.easeInOut(duration: 0.3)) {
+                // Smoother scroll animation
+                withAnimation(.easeInOut(duration: 0.6)) {
                     proxy.scrollTo(viewModel.lyrics[newIndex].id, anchor: .center)
                 }
             }
@@ -98,19 +100,50 @@ struct LyricLine: View {
     let line: SyncedLine
     let isActive: Bool
     let isPast: Bool
+    let currentTime: TimeInterval
     
     var body: some View {
-        Text(line.text)
-            .font(.system(size: isActive ? 24 : 18, weight: isActive ? .bold : .medium))
-            .foregroundStyle(
-                isActive ? .white :
-                isPast ? SangeetTheme.textMuted :
-                SangeetTheme.textSecondary
-            )
-            .multilineTextAlignment(.center)
-            .frame(maxWidth: .infinity)
-            .scaleEffect(isActive ? 1.05 : 1.0)
-            .animation(.spring(response: 0.3), value: isActive)
+        Group {
+            if let words = line.words, !words.isEmpty, isActive {
+                karaokeText(words: words)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(6) // Increased line spacing
+                    .frame(maxWidth: .infinity)
+                    .scaleEffect(1.05)
+                    .animation(.spring(response: 0.3), value: currentTime) // Slightly slower spring for smoothness
+            } else {
+                Text(line.text)
+                    // Significantly bigger fonts
+                    .font(.system(size: isActive ? 34 : 24, weight: isActive ? .bold : .medium))
+                    .foregroundStyle(
+                        isActive ? .white :
+                        isPast ? SangeetTheme.textMuted :
+                        SangeetTheme.textSecondary
+                    )
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .scaleEffect(isActive ? 1.05 : 1.0)
+                    .animation(.spring(response: 0.4), value: isActive)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func karaokeText(words: [SyncedWord]) -> Text {
+        // Start with empty text
+        var text = Text("")
+        
+        for (index, word) in words.enumerated() {
+            let isSung = currentTime >= word.start
+            let wordText = Text(word.text)
+                // Use Accent Color (primary) for sung words, Muted for future
+                .foregroundStyle(isSung ? SangeetTheme.primary : SangeetTheme.textMuted.opacity(0.6))
+                .font(.system(size: 34, weight: isSung ? .bold : .medium)) // Bigger font for karaoke too
+            
+            text = text + wordText
+        }
+        
+        return text
     }
 }
 

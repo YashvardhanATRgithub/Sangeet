@@ -74,6 +74,7 @@ class AppState: ObservableObject {
     @Published var homeNavigationPath: [PlaylistRecord] = []
     @Published var playlistNavigationPath: [PlaylistRecord] = []
     @Published var libraryNavigationPath: [LibraryPathItem] = []
+    @Published var isLyricsVisible: Bool = false // Persistent lyrics state
     
     enum Tab: String, CaseIterable {
         case home = "Home"

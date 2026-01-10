@@ -12,7 +12,7 @@ import SwiftUI
 struct FullScreenPlayerView: View {
     @Binding var isPresented: Bool
     @EnvironmentObject var playbackManager: PlaybackManager
-    @State private var showLyrics = false
+    @EnvironmentObject var appState: AppState // Access global state
     
     var body: some View {
         ZStack {
@@ -33,10 +33,14 @@ struct FullScreenPlayerView: View {
                     
                     Spacer()
                     
-                    Button(action: { showLyrics.toggle() }) {
-                        Image(systemName: showLyrics ? "text.bubble.fill" : "text.bubble")
+                    Button(action: { 
+                        withAnimation {
+                            appState.isLyricsVisible.toggle() 
+                        }
+                    }) {
+                        Image(systemName: appState.isLyricsVisible ? "text.bubble.fill" : "text.bubble")
                             .font(.title3)
-                            .foregroundStyle(showLyrics ? SangeetTheme.primary : .white.opacity(0.7))
+                            .foregroundStyle(appState.isLyricsVisible ? SangeetTheme.primary : .white.opacity(0.7))
                     }
                     .buttonStyle(.plain)
                 }
@@ -46,11 +50,14 @@ struct FullScreenPlayerView: View {
                 Spacer()
                 
                 // Main content
-                HStack(spacing: 40) {
+                HStack(spacing: 60) {
                     // Album art side
+                    // Balanced split view: Both sides get flexible frames
                     VStack(spacing: 32) {
                         // Artwork with glow
-                        ArtworkView(track: playbackManager.currentTrack, size: 300, cornerRadius: 24, showGlow: true)
+                        // Increased size for "Big" look
+                        ArtworkView(track: playbackManager.currentTrack, size: appState.isLyricsVisible ? 350 : 450, cornerRadius: 24, showGlow: true)
+                            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: appState.isLyricsVisible)
                         
                         // Track info
                         VStack(spacing: 12) {
@@ -78,17 +85,17 @@ struct FullScreenPlayerView: View {
                                 }
                             }
                         }
-                        .frame(maxWidth: 300)
+                        .frame(maxWidth: 350)
                     }
+                    .frame(maxWidth: .infinity) // Take up equal space
                     
                     // Lyrics panel
-                    if showLyrics {
-                        VStack {
-                            LyricsView()
-                        }
-                        .frame(width: 350, height: 400)
-                        .glassmorphic(cornerRadius: 24)
-                        .transition(.scale.combined(with: .opacity))
+                    if appState.isLyricsVisible {
+                        LyricsView()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            // Removed glassmorphic container for "background" feel
+                            .mask(LinearGradient(colors: [.clear, .black, .black, .clear], startPoint: .top, endPoint: .bottom))
+                            .transition(.move(edge: .trailing).combined(with: .opacity))
                     }
                 }
                 .padding(.horizontal, 60)
@@ -165,7 +172,7 @@ struct FullScreenPlayerView: View {
                 .padding(.bottom, 40)
             }
         }
-        .animation(.spring(response: 0.3), value: showLyrics)
+        .animation(.spring(response: 0.3), value: appState.isLyricsVisible)
         .gesture(DragGesture().onEnded { if $0.translation.height > 80 { isPresented = false } })
     }
     

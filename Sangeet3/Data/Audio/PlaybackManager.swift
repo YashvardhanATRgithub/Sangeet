@@ -216,22 +216,43 @@ final class PlaybackManager: ObservableObject {
     
     // MARK: - Playback Controls
     
+    /// Starts a "Radio" session based on the seed track.
+    /// Resets the queue to just this track and immediately generates similar songs.
+    func startRadio(from track: Track) {
+        // 1. Reset Queue
+        self.queue = [track]
+        self.queueIndex = 0
+        
+        // 2. Play (Force Context Switch Logic is handled, but we want to be explicit about Smart Queue)
+        play(track)
+        
+        // 3. Force Smart Queue (Radio Mode)
+        // play(track) will see it in queue and NOT trigger smart queue if infinite is off.
+        // So we explicitly trigger it here.
+        Task {
+            await updateSmartQueue(for: track, force: true)
+        }
+    }
+    
     func play(_ track: Track) {
         guard !isTransitioning else { return }
         
         // Context Switch: If track is NOT in the current queue, start a new queue context.
+        var isContextSwitch = false
         if let index = queue.firstIndex(where: { $0.id == track.id }) {
             self.queueIndex = index
         } else {
             // New Context (e.g. Played from Search)
             self.queue = [track]
             self.queueIndex = 0
+            isContextSwitch = true
             print("[PlaybackManager] Context Switch: Reset queue for '\(track.title)'")
         }
         
         // Dynamic Smart Queue (Instant Update)
-        if isInfiniteQueueEnabled {
-            Task { await updateSmartQueue(for: track) }
+        // If it's a context switch (new session), we ALWAYS want similar songs if online.
+        if isContextSwitch || isInfiniteQueueEnabled {
+            Task { await updateSmartQueue(for: track, force: isContextSwitch) }
         } else {
             // Even if infinite queue is off, we should pre-cache existing songs
             preCacheUpcomingTracks()
@@ -580,7 +601,7 @@ final class PlaybackManager: ObservableObject {
     
     private var smartQueueTask: Task<Void, Never>?
     
-    private func updateSmartQueue(for track: Track?) async {
+    private func updateSmartQueue(for track: Track?, force: Bool = false) async {
         guard let seed = track else { return }
         
         // Cancel previous update to avoid race conditions
@@ -594,7 +615,9 @@ final class PlaybackManager: ObservableObject {
                 return remaining < 5 // Only update if running low
             }
             
-            if !shouldUpdate && !isInfiniteQueueEnabled { return }
+            // If Forced (Context Switch) OR Low on songs (Infinite Queue), proceed.
+            // Otherwise stop.
+            if !force && (!shouldUpdate || !isInfiniteQueueEnabled) { return }
             
             // 2. Fetch New Recommendations FIRST
             print("[PlaybackManager] Smart Queue: Fetching recommendations for '\(seed.title)'...")

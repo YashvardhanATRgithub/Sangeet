@@ -523,22 +523,91 @@ final class LibraryManager: ObservableObject {
     // MARK: - Track Operations
     
     func toggleFavorite(_ track: Track) {
+        // 1. Check if track is already in library (by ID)
         if let index = tracks.firstIndex(where: { $0.id == track.id }) {
+            // Track Exists
             tracks[index].isFavorite.toggle()
+            let newValue = tracks[index].isFavorite
             
-            // Recommendation Engine Hook
-            if tracks[index].isFavorite {
+            // Smart Download: If marking as Favorite AND it's a Remote track -> Download it
+            if newValue && tracks[index].isRemote {
+                print("[LibraryManager] Smart Favorite: Auto-downloading '\(track.title)'")
+                triggerDownload(for: tracks[index])
+            }
+            
+            // Interaction & DB Update
+            if newValue {
                 RecommendationEngine.shared.recordInteraction(for: track, type: .liked)
             } else {
                 RecommendationEngine.shared.recordInteraction(for: track, type: .unliked)
             }
             
-            // Update in database
             DatabaseManager.shared.writeAsync { db in
                 let record = TrackRecord(from: self.tracks[index])
                 try record.update(db)
             }
+        } else {
+            // 2. Track NOT in library (e.g. from Search/Trending)
+            // Add to library, Mark Favorite, and Download
+            print("[LibraryManager] Smart Favorite: Adding & Downloading new track '\(track.title)'")
+            
+            var newTrack = track
+            newTrack.isFavorite = true
+            newTrack.dateAdded = Date()
+            
+            // Add to memory
+            tracks.append(newTrack)
+            rebuildIndexes()
+            
+            // Add to DB
+            DatabaseManager.shared.writeAsync { db in
+                try TrackRecord(from: newTrack).insert(db)
+            }
+            
+            // Trigger Download if Remote
+            if newTrack.isRemote {
+                triggerDownload(for: newTrack)
+            }
+            
+            RecommendationEngine.shared.recordInteraction(for: newTrack, type: .liked)
         }
+    }
+    
+    private func triggerDownload(for track: Track) {
+        guard let url = track.fileURL.absoluteString.removingPercentEncoding,
+              url.starts(with: "tidal://"),
+              let idStr = track.fileURL.host,
+              let id = Int(idStr) else { return }
+        
+        // Construct Proxy TidalTrack
+        // We assume valid metadata is present in the Track object
+        let artistObj = TidalArtist(id: 0, name: track.artist)
+        let albumObj = TidalAlbum(id: 0, title: track.album, cover: nil) // We don't need cover ID for download if we have cover URL?
+        // Actually DownloadManager uses `track.coverURL` which is computed from `track.album.cover`.
+        // The `Track` object stores `artworkData` or we might fetch it?
+        // Wait, `DownloadManager` expects `TidalTrack`. `TidalTrack` computes coverURL from `album.cover` path.
+        // `Track` doesn't store the specific Tidal cover ID.
+        
+        // Let's create a partial TidalTrack.
+        // DownloadManager uses: id, title, artist.name, album.title, coverURL (optional).
+        
+        // If we don't have the cover path, we might miss the cover art in the download unless we fetch full metadata.
+        // For "Smart Favorites", speed is key. We can download audio first.
+        // OR: We can construct `TidalTrack` better if the original `Track` came from `TidalTrack` conversion.
+        // But `Track` struct loses the specific Tidal cover ID.
+        
+        let tidalTrack = TidalTrack(
+            id: id,
+            title: track.title,
+            duration: Int(track.duration),
+            artist: artistObj,
+            artists: [artistObj],
+            album: albumObj,
+            releaseDate: nil,
+            popularity: nil
+        )
+        
+        DownloadManager.shared.download(track: tidalTrack)
     }
     
 

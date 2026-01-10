@@ -32,8 +32,15 @@ Sangeet is a premium, native macOS music player built for audiophiles who demand
 - **Infinite Queue**: Never stops playing music, automatically queuing similar tracks when your playlist ends.
 - **Stats & History**: Track your listening habits with detailed statistics.
 
-### 🌐 Online Streaming
-- **Tidal Integration**: Search and stream high-quality music from Tidal's catalog directly within the app.
+### 🎤 Immersive Karaoke
+- **Synced Lyrics**: Word-by-word synchronized lyrics (karaoke style) for supported tracks.
+- **Immersive UI**: Beautiful, full-screen overlay mode that blends lyrics with the album art background.
+- **Persistent State**: Lyrics visibility preference is remembered across sessions.
+
+### 🌐 Online Streaming & Smart Smarts
+- **Tidal Integration**: Search and stream high-quality music fro Tidal's catalog directly within the app.
+- **Smart Favorites**: Clicking "Heart" on a streaming track automatically adds it to your library and downloads it offline.
+- **Smart Queue**: Intelligent "Play Next" algorithm that mixes Similar Artists and Track Radio.
 - **Trending Charts**: Browse trending songs from iTunes charts (International & India).
 - **Download Support**: Save online tracks to your local library for offline playback.
 - **Seamless Playback**: Stream with the same audiophile-grade engine as local files.

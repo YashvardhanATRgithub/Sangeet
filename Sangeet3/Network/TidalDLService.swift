@@ -59,6 +59,26 @@ struct TidalPlaybackInfo: Codable, Sendable {
     let manifest: String?
 }
 
+struct TidalLyricsLine: Codable, Sendable {
+    let time: Double?
+    let text: String?
+    let isInstrumental: Bool?
+    
+    enum CodingKeys: String, CodingKey {
+        case time = "timestamp"
+        case text
+        case isInstrumental
+    }
+}
+
+struct TidalLyrics: Codable, Sendable {
+    let trackId: Int
+    let lyrics: String?
+    let syncLyrics: [TidalLyricsLine]?
+    let provider: String?
+    let copyright: String?
+}
+
 enum TidalQuality: String, Sendable {
     case HI_RES = "HI_RES"
     case LOSSLESS = "LOSSLESS"
@@ -313,6 +333,35 @@ actor TidalDLService {
         }
         return []
     }
+    
+    // MARK: - Lyrics
+    
+    func getLyrics(trackID: Int) async throws -> TidalLyrics? {
+        let urlString = "https://triton.squid.wtf/lyrics/?id=\(trackID)"
+        guard let url = URL(string: urlString) else { return nil }
         
+        print("[TidalService] Fetching Lyrics: \(url.absoluteString)")
+        
+        let (data, response) = try await session.data(from: url)
+        
+        if let httpResponse = response as? HTTPURLResponse {
+            if httpResponse.statusCode == 404 {
+                print("[TidalService] No lyrics found (404)")
+                return nil
+            }
+        }
+        
+        do {
+            let wrapper = try JSONDecoder().decode(TidalResponse<TidalLyrics>.self, from: data)
+            return wrapper.data
+        } catch {
+            print("[TidalService] Lyrics Decode Error: \(error)")
+            // Fallback: Check if it's not wrapped? (Unlikely for this API but safe)
+             if let lyrics = try? JSONDecoder().decode(TidalLyrics.self, from: data) {
+                 return lyrics
+             }
+            return nil
+        }
+    }
 
 }
