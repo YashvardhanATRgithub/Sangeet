@@ -30,3 +30,5 @@ Screenshots/walkthrough.mov
 pack.temp.dmg
 build_error.log
 tidal-ui-temp/
+*.xcarchive
+Exported/
