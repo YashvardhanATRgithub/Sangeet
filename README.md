@@ -1,4 +1,4 @@
-# Sangeet v3.2.0 - The Intelligent Audiophile Player
+# Sangeet v3.3.0 - The Intelligent Audiophile Player
 
 > "Smart Queue, Mood Matching, and Offline Intelligence."
 
@@ -38,7 +38,7 @@ Sangeet is a premium, native macOS music player built for audiophiles who demand
 - **Persistent State**: Lyrics visibility preference is remembered across sessions.
 
 ### 🌐 Online Streaming & Smart Smarts
-- **Tidal Integration**: Search and stream high-quality music fro Tidal's catalog directly within the app.
+- **Tidal Integration**: Search and stream high-quality music from Tidal's catalog directly within the app.
 - **Smart Favorites**: Clicking "Heart" on a streaming track automatically adds it to your library and downloads it offline.
 - **Smart Queue**: Intelligent "Play Next" algorithm that mixes Similar Artists and Track Radio.
 - **Trending Charts**: Browse trending songs from iTunes charts (International & India).
