@@ -27,12 +27,11 @@ struct HomeView: View {
                         
                         HStack(spacing: 16) {
                             QuickActionCard(title: "Favorites", subtitle: "\(libraryManager.favorites.count) songs", icon: "heart.fill", color: .red) {
-                                // Favorites still navigates to Playlists tab
+                                // Favorites navigates to the Playlists tab.
+                                // changeTab resets navigation paths, so push after switching.
                                 let favRecord = PlaylistRecord(id: "favorites", name: "Favorites", isSystem: true)
-                                if appState.playlistNavigationPath.isEmpty {
-                                    appState.playlistNavigationPath.append(favRecord)
-                                }
                                 appState.changeTab(to: .playlists)
+                                appState.playlistNavigationPath.append(favRecord)
                             }
                             
                             QuickActionCard(title: "History", subtitle: "Recently played", icon: "clock.arrow.circlepath", color: .orange) {
@@ -65,9 +64,6 @@ struct HomeView: View {
                 PlaylistDetailView(playlist: selectedPlaylist, isFavorites: false)
                     .transition(.move(edge: .trailing))
             }
-        }
-        .onAppear {
-            Task { await libraryManager.fetchTopSongs() }
         }
     }
     
@@ -166,60 +162,6 @@ struct QuickActionCard: View {
         .buttonStyle(.plain)
     }
 }
-
-struct TrendingSongCard: View {
-    let song: TidalTrack
-    @State private var isHovering = false
-    @EnvironmentObject var libraryManager: LibraryManager
-    
-    /// Check if this song is already downloaded
-    private var isDownloaded: Bool {
-        libraryManager.hasTrack(title: song.title, artist: song.artistName)
-    }
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ZStack(alignment: .topTrailing) {
-                AsyncImage(url: song.coverURL) { phase in
-                    switch phase {
-                    case .empty: Color.gray.opacity(0.3)
-                    case .success(let image): image.resizable()
-                    case .failure: Color.gray.opacity(0.3)
-                    @unknown default: Color.gray.opacity(0.3)
-                    }
-                }
-                .frame(width: 140, height: 140)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                
-                // Overlay for download button
-                if isHovering {
-                    TidalDownloadButton(track: song, size: 28, color: SangeetTheme.primary)
-                        .padding(6)
-                }
-                
-                // Downloaded indicator (if not hovering and already downloaded) - Optional, 
-                // but TidalDownloadButton handles state well. 
-                // Let's rely on TidalDownloadButton which shows Checkmark if downloaded.
-            }
-            .onHover { isHovering = $0 }
-            .animation(.easeInOut(duration: 0.2), value: isHovering)
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text(song.title)
-                    .font(.subheadline.bold())
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                Text(song.artistName)
-                    .font(.caption)
-                    .foregroundStyle(SangeetTheme.textSecondary)
-                    .lineLimit(1)
-            }
-        }
-        .frame(width: 140)
-    }
-}
-
-// SongRow struct removed as it is replaced by UniversalSongRow
 
 struct SongCard: View {
     let track: Track

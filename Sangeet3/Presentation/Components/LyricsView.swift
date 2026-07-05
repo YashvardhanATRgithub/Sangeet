@@ -18,10 +18,12 @@ struct LyricsView: View {
         ZStack {
             if viewModel.isLoading {
                 loadingView
-            } else if viewModel.lyrics.isEmpty {
-                noLyricsView
-            } else {
+            } else if !viewModel.lyrics.isEmpty {
                 lyricsScrollView
+            } else if let plain = viewModel.plainLyrics {
+                plainLyricsView(plain)
+            } else {
+                noLyricsView
             }
         }
         .onChange(of: playbackManager.currentTrack?.id) { _, _ in
@@ -42,6 +44,19 @@ struct LyricsView: View {
         }
     }
     
+    func plainLyricsView(_ text: String) -> some View {
+        ScrollView(showsIndicators: false) {
+            Text(text)
+                .font(.system(size: 20, weight: .medium))
+                .foregroundStyle(SangeetTheme.textSecondary)
+                .multilineTextAlignment(.center)
+                .lineSpacing(10)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 60)
+        }
+    }
+
     var noLyricsView: some View {
         VStack(spacing: 16) {
             Image(systemName: "text.quote")
@@ -128,22 +143,19 @@ struct LyricLine: View {
         }
     }
     
-    @ViewBuilder
     private func karaokeText(words: [SyncedWord]) -> Text {
-        // Start with empty text
-        var text = Text("")
-        
-        for (index, word) in words.enumerated() {
+        var attributed = AttributedString()
+
+        for word in words {
             let isSung = currentTime >= word.start
-            let wordText = Text(word.text)
-                // Use Accent Color (primary) for sung words, Muted for future
-                .foregroundStyle(isSung ? SangeetTheme.primary : SangeetTheme.textMuted.opacity(0.6))
-                .font(.system(size: 34, weight: isSung ? .bold : .medium)) // Bigger font for karaoke too
-            
-            text = text + wordText
+            var part = AttributedString(word.text)
+            // Accent color for sung words, muted for upcoming ones
+            part.foregroundColor = isSung ? SangeetTheme.primary : SangeetTheme.textMuted.opacity(0.6)
+            part.font = .system(size: 34, weight: isSung ? .bold : .medium)
+            attributed += part
         }
-        
-        return text
+
+        return Text(attributed)
     }
 }
 
@@ -151,27 +163,32 @@ struct LyricLine: View {
 @MainActor
 class LyricsViewModel: ObservableObject {
     @Published var lyrics: [SyncedLine] = []
+    @Published var plainLyrics: String?
     @Published var currentLineIndex: Int = -1
     @Published var isLoading = false
-    
+
+    private var loadedTrackId: UUID?
+
     func loadLyrics(for track: Track?) {
         guard let track = track else {
             lyrics = []
+            plainLyrics = nil
             currentLineIndex = -1
+            loadedTrackId = nil
             return
         }
-        
+
         isLoading = true
-        
+        loadedTrackId = track.id
+
         Task {
-            let result = await LyricsService.shared.fetchLyrics(
-                title: track.title,
-                artist: track.artist,
-                album: track.album,
-                duration: track.duration
-            )
-            
+            let result = await LyricsService.shared.fetchLyrics(for: track)
+
+            // Ignore stale results if the track changed while loading
+            guard self.loadedTrackId == track.id else { return }
+
             self.lyrics = result?.syncedLyrics ?? []
+            self.plainLyrics = result?.plainLyrics
             self.currentLineIndex = -1
             self.isLoading = false
         }

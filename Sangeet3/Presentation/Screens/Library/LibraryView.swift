@@ -117,8 +117,8 @@ struct LibraryView: View {
                 ForEach(Array(libraryManager.artists.keys.sorted()), id: \.self) { artist in
                     if let tracks = libraryManager.artists[artist] {
                         VStack(spacing: 12) {
-                            // Circular Artist Image
-                            ArtistArtworkView(artist: artist)
+                            // Circular Artist Image (from the artist's own tracks)
+                            ArtistArtworkView(artist: artist, tracks: tracks)
                             
                             VStack(spacing: 4) { // ... text remains same
                                 Text(artist)
@@ -233,40 +233,27 @@ struct LibraryCategoryCard: View {
 
 struct ArtistArtworkView: View {
     let artist: String
-    @State private var artworkURL: URL? = nil
-    @State private var isLoading = true
-    
+    let tracks: [Track]
+
+    /// First track by this artist that has artwork available
+    private var artworkTrack: Track? {
+        tracks.first(where: { $0.artworkData != nil }) ?? tracks.first
+    }
+
     var body: some View {
         ZStack {
-            if let url = artworkURL {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .empty:
-                        ProgressView()
-                    case .success(let image):
-                        image.resizable().aspectRatio(contentMode: .fill)
-                    case .failure:
-                        initialsView
-                    @unknown default:
-                        initialsView
-                    }
-                }
+            if let track = artworkTrack, track.artworkData != nil {
+                ArtworkView(track: track, size: 120, cornerRadius: 60)
             } else {
                 initialsView
+                    .frame(width: 120, height: 120)
             }
         }
         .frame(width: 120, height: 120)
         .clipShape(Circle())
         .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
-        .task {
-            // Load artist artwork
-            if artworkURL == nil {
-                artworkURL = await SmartMetadataManager.shared.getArtistArtwork(artist: artist)
-                isLoading = false
-            }
-        }
     }
-    
+
     var initialsView: some View {
         Circle()
             .fill(SangeetTheme.surfaceElevated)

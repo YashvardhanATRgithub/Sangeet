@@ -1,10 +1,12 @@
-# Sangeet v3.3.1 - The Intelligent Audiophile Player
+# Sangeet v3.4.0 - The Offline-First Audiophile Player
 
-> "Smart Queue, Mood Matching, and Offline Intelligence."
+> "Your music. Your device."
 
 ![Project Walkthrough](Screenshots/walkthrough.gif)
 
 Sangeet is a premium, native macOS music player built for audiophiles who demand bit-perfect audio quality without compromising on aesthetics. Powered by the industry-standard **BASS Audio Engine** and wrapped in a stunning **Glassmorphic SwiftUI** interface, Sangeet bridges the gap between professional audio tools and modern design.
+
+Sangeet is **offline-first**: playback, your library, listening history, and taste profile all live on your Mac and work without internet. The only network feature is optional lyrics fetching — and once fetched, lyrics are cached locally for offline use.
 
 ---
 
@@ -28,22 +30,20 @@ Sangeet is a premium, native macOS music player built for audiophiles who demand
 ### 📂 Powerful Library Management
 - **Folder-Based Library**: Drag and drop your music folders directly—no "importing" or duplicating files.
 - **Instant Search**: Global Cmd+K search to find any track, album, or artist instantly.
-- **Smart Metadata**: Automatically fetches high-res artwork and corrects tags.
-- **Infinite Queue**: Never stops playing music, automatically queuing similar tracks when your playlist ends.
+- **Local Metadata**: Reads tags and artwork straight from your files (with folder-art fallback).
+- **Infinite Queue & Radio**: Never stops playing - similar tracks from your own library are queued automatically, ranked by a local taste profile.
 - **Stats & History**: Track your listening habits with detailed statistics.
 
 ### 🎤 Immersive Karaoke
-- **Synced Lyrics**: Word-by-word synchronized lyrics (karaoke style) for supported tracks.
+- **Word-by-Word Sync**: Fetches word-synced lyrics online (LyricsPlus, with LRCLib line-sync fallback) for a true karaoke experience.
+- **Offline-First Lyrics**: Local `.lrc` sidecar files (including enhanced word timing), `.txt` files, and lyrics embedded in your audio tags always take priority — and every fetched lyric is cached on disk for offline replay.
 - **Immersive UI**: Beautiful, full-screen overlay mode that blends lyrics with the album art background.
 - **Persistent State**: Lyrics visibility preference is remembered across sessions.
 
-### 🌐 Online Streaming & Smart Smarts
-- **Tidal Integration**: Search and stream high-quality music from Tidal's catalog directly within the app.
-- **Smart Favorites**: Clicking "Heart" on a streaming track automatically adds it to your library and downloads it offline.
-- **Smart Queue**: Intelligent "Play Next" algorithm that mixes Similar Artists and Track Radio.
-- **Trending Charts**: Browse trending songs from iTunes charts (International & India).
-- **Download Support**: Save online tracks to your local library for offline playback.
-- **Seamless Playback**: Stream with the same audiophile-grade engine as local files.
+### 🔒 Offline-First & Private
+- **Playback never needs internet**: Your music plays entirely from local files; lyrics fetching is the app's only network feature.
+- **Local Smart Queue**: The "Radio" and Infinite Queue features are powered entirely by your own library and a local, on-device taste profile.
+- **Your data stays yours**: Play counts, favorites, and listening history live in a local SQLite database. No accounts, no analytics, no tracking.
 
 ---
 
@@ -57,9 +57,9 @@ Sangeet is a premium, native macOS music player built for audiophiles who demand
 |:---:|:---:|
 | ![Songs](Screenshots/songs_screen.png) <br> ![Playlists](Screenshots/playlists_screen.png) | ![Queue](Screenshots/queue_screen.png) <br> ![EQ](Screenshots/eq_screen.png) |
 
-| Online Streaming | Settings & Extras |
+| Settings & Extras | |
 |:---:|:---:|
-| ![Online](Screenshots/online.png) | ![Settings](Screenshots/settings.png) <br> ![Metadata](Screenshots/metadata.png) |
+| ![Settings](Screenshots/settings.png) | |
 
 
 ---
@@ -98,8 +98,6 @@ Special thanks to the creators of the libraries and services that make Sangeet p
 
 - **[Un4seen Developments](https://www.un4seen.com/)**: For the incredible **BASS Audio Library**, which powers the core audio engine, DSP, and gapless playback features.
 - **[Gwendal Roué](https://github.com/groue)**: For **GRDB.swift**, the robust SQLite toolkit that handles the music library database.
-- **[Tidal](https://tidal.com/)**: For providing high-quality music streaming capabilities.
-- **[Apple iTunes](https://rss.applemarketingtools.com/)**: For the RSS Feed API powering trending charts.
 - **Apple**: For SwiftUI and CoreAudio.
 
 ---

@@ -8,11 +8,9 @@ struct SettingsView: View {
     // Feature Toggles (bound to UserSettings/AudiophileSettings)
     @ObservedObject var audioSettings = AudiophileSettings.shared
     @ObservedObject var libraryManager = LibraryManager.shared
-    @ObservedObject var metadataManager = SmartMetadataManager.shared
-    
+
     // Popup States
     @State private var showLibraryParams = false
-    @State private var showMetadataParams = false
     @State private var showEQParams = false
     @State private var showStatsParams = false
     @State private var showAboutParams = false
@@ -119,7 +117,6 @@ struct SettingsView: View {
         }
         // Popups
         .sheet(isPresented: $showLibraryParams) { LibrarySettingsSheet() }
-        .sheet(isPresented: $showMetadataParams) { MetadataSettingsSheet() }
         .sheet(isPresented: $showEQParams) { VisualEQSheet() }
         .sheet(isPresented: $showStatsParams) { StatsSheet() }
         .sheet(isPresented: $showAboutParams) { AboutSheet() }
@@ -130,32 +127,30 @@ struct SettingsView: View {
     @Namespace private var namespace
     
     // Define Settings Configuration
-    // 11 items evenly spaced: 360/11 ≈ 32.7° apart
+    // 10 items evenly spaced: 360/10 = 36° apart
     var items: [SettingsItem] {
         [
             // Top (Music Note) -> Library
             .init(name: "Library", description: "Manage your music sources. Add or remove folders to scan for local tracks.", icon: "music.note.list", angle: 0, type: .action({ showLibraryParams = true })),
-            
+
             // Clockwise from top
-            .init(name: "Metadata", description: "Automatically scan and fix missing tags and artwork for your library.", icon: "wand.and.stars", angle: 33, type: .action({ showMetadataParams = true })),
-            
-            .init(name: "Seamless", description: "Eliminate silence between tracks for a continuous, album-like experience.", icon: "arrow.triangle.2.circlepath", angle: 65, type: .toggle($audioSettings.seamlessPlayback)),
-            
-            .init(name: "Crossfade", description: "Smoothly overlap the end of one song with the start of the next.", icon: "waveform.path.ecg", angle: 98, type: .action({ showCrossfadeParams = true })),
-            
-            .init(name: "Exclusive", description: "Bypass the system mixer to take full control of your audio device.", icon: "lock.shield", angle: 131, type: .toggle($audioSettings.exclusiveAudioAccess)),
-            
-            .init(name: "Bit-Perfect", description: "Output audio at its native sample rate without resampling.", icon: "checkmark.seal", angle: 164, type: .toggle($audioSettings.bitPerfectOutput)),
-            
-            .init(name: "Hi-Res", description: "Prioritize the highest available quality and sample rate for playback.", icon: "waveform", angle: 196, type: .toggle($audioSettings.nativeSampleRate)),
-            
-            .init(name: "Stats", description: "View detailed statistics about your music library and listening habits.", icon: "chart.bar", angle: 229, type: .action({ showStatsParams = true })),
-            
-            .init(name: "About", description: "Information about Sangeet, its version, and the developer.", icon: "info.circle", angle: 262, type: .action({ showAboutParams = true })),
-            
-            .init(name: "Equalizer", description: "Customize the frequency response to match your taste or headphones.", icon: "slider.vertical.3", angle: 295, type: .action({ showEQParams = true })),
-            
-            .init(name: "Theme", description: "Change the app's accent color with a beautiful color spectrum.", icon: "paintpalette", angle: 327, type: .action({ showThemeParams = true }))
+            .init(name: "Seamless", description: "Eliminate silence between tracks for a continuous, album-like experience.", icon: "arrow.triangle.2.circlepath", angle: 36, type: .toggle($audioSettings.seamlessPlayback)),
+
+            .init(name: "Crossfade", description: "Smoothly overlap the end of one song with the start of the next.", icon: "waveform.path.ecg", angle: 72, type: .action({ showCrossfadeParams = true })),
+
+            .init(name: "Exclusive", description: "Bypass the system mixer to take full control of your audio device.", icon: "lock.shield", angle: 108, type: .toggle($audioSettings.exclusiveAudioAccess)),
+
+            .init(name: "Bit-Perfect", description: "Output audio at its native sample rate without resampling.", icon: "checkmark.seal", angle: 144, type: .toggle($audioSettings.bitPerfectOutput)),
+
+            .init(name: "Normalize", description: "Balance volume across tracks using ReplayGain tags or analyzed loudness.", icon: "speaker.wave.2.circle", angle: 180, type: .toggle($audioSettings.volumeNormalization)),
+
+            .init(name: "Stats", description: "View detailed statistics about your music library and listening habits.", icon: "chart.bar", angle: 216, type: .action({ showStatsParams = true })),
+
+            .init(name: "About", description: "Information about Sangeet, its version, and the developer.", icon: "info.circle", angle: 252, type: .action({ showAboutParams = true })),
+
+            .init(name: "Equalizer", description: "Customize the frequency response to match your taste or headphones.", icon: "slider.vertical.3", angle: 288, type: .action({ showEQParams = true })),
+
+            .init(name: "Theme", description: "Change the app's accent color with a beautiful color spectrum.", icon: "paintpalette", angle: 324, type: .action({ showThemeParams = true }))
         ]
     }
     
@@ -208,7 +203,8 @@ struct SettingNode: View {
 struct LibrarySettingsSheet: View {
     @EnvironmentObject var libraryManager: LibraryManager
     @Environment(\.dismiss) var dismiss
-    
+    @State private var defaultFolderMessage: String?
+
     var body: some View {
         VStack(spacing: 20) {
             Text("Library Folders").font(.headline)
@@ -221,61 +217,42 @@ struct LibrarySettingsSheet: View {
                         Button(action: { libraryManager.removeFolder(folder) }) {
                             Image(systemName: "trash").foregroundStyle(.red)
                         }
+                        .buttonStyle(.plain)
                     }
                 }
             }
             .frame(height: 200)
-            
+
             HStack {
                 Button("Add Folder") { libraryManager.addFolder() }
-                
-                // New Default Folder Button
+
+                // Creates ~/Music/Sangeet and adds it as a library folder
                 Button(action: {
-                    Task { _ = await libraryManager.createDefaultFolder() }
+                    Task {
+                        if let url = await libraryManager.createDefaultFolder() {
+                            defaultFolderMessage = "Created and added \(url.path). Drop music files there and they'll appear in your library."
+                        } else {
+                            defaultFolderMessage = "Could not create the default folder in ~/Music. You can use \"Add Folder\" to pick one instead."
+                        }
+                    }
                 }) {
                     Text("Create Default")
                         .foregroundStyle(SangeetTheme.primary)
                 }
+                .help("Creates ~/Music/Sangeet and adds it to your library")
             }
             Button("Done") { dismiss() }
         }
         .padding()
         .frame(width: 400)
-    }
-}
-
-struct MetadataSettingsSheet: View {
-    @ObservedObject var metadataManager = SmartMetadataManager.shared
-    @EnvironmentObject var libraryManager: LibraryManager
-    @Environment(\.dismiss) var dismiss
-
-    var body: some View {
-        VStack(spacing: 20) {
-            Text("Metadata Management").font(.headline)
-            Text("Scan library and auto-tag songs with iTunes metadata.")
-                .multilineTextAlignment(.center)
-            
-            if metadataManager.isBulkFixing {
-                // If already running, show status but user can close sheet and watch top bar
-                Text("Scan in progress... Check the top bar.")
-                    .foregroundStyle(.secondary)
-                ProgressView()
-                    .padding(.bottom, 10)
-            } else {
-                Button("Start Auto-Tagging") {
-                    Task {
-                        dismiss() // Close sheet immediately
-                        // Give explicit delay to allow sheet to close before heaviness
-                        try? await Task.sleep(nanoseconds: 500_000_000)
-                        await metadataManager.fixAllMetadata(libraryManager: libraryManager)
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-            }
-            Button("Done") { dismiss() }
+        .alert("Default Folder", isPresented: .init(
+            get: { defaultFolderMessage != nil },
+            set: { if !$0 { defaultFolderMessage = nil } }
+        )) {
+            Button("OK") { defaultFolderMessage = nil }
+        } message: {
+            Text(defaultFolderMessage ?? "")
         }
-        .padding()
-        .frame(width: 400)
     }
 }
 
@@ -353,44 +330,51 @@ struct StatView: View {
 struct AboutSheet: View {
     @Environment(\.dismiss) var dismiss
     @StateObject private var updater = UpdateChecker.shared
-    
+
+    private var currentVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "3.0"
+    }
+
     var body: some View {
         VStack(spacing: 16) {
             Image(systemName: "waveform.circle.fill")
                 .font(.system(size: 64))
                 .foregroundStyle(SangeetTheme.primaryGradient)
-            Text("Sangeet \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "3.0")").font(.title.bold())
-            Text("Premium Music Player for macOS").font(.body)
-            
+            Text("Sangeet \(currentVersion)").font(.title.bold())
+            Text("Offline-First Music Player for macOS").font(.body)
+
             if updater.updateAvailable {
-                Button(action: {
-                    if let url = updater.releaseURL {
-                         NSWorkspace.shared.open(url)
+                Button(action: { updater.openReleasePage() }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.down.circle.fill")
+                        Text("Update to v\(updater.latestVersion)")
                     }
-                }) {
-                    HStack {
-                         Image(systemName: "arrow.down.circle.fill")
-                         Text("Update Available (\(updater.latestVersion))")
-                    }
-                    .padding(8)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
                     .background(Color.green.opacity(0.2))
-                    .cornerRadius(8)
+                    .foregroundStyle(.green)
+                    .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(.green)
+            } else if updater.isChecking {
+                HStack(spacing: 6) {
+                    ProgressView().scaleEffect(0.6)
+                    Text("Checking for updates…")
+                        .font(.caption)
+                        .foregroundStyle(SangeetTheme.textSecondary)
+                }
             } else {
-                 Text("You are up to date.")
-                     .font(.caption)
-                     .foregroundStyle(.secondary)
+                Button("Check for Updates") { updater.checkForUpdates() }
+                    .font(.caption)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(SangeetTheme.primary)
             }
-            
+
             Button("Done") { dismiss() }
         }
         .padding()
         .frame(width: 300)
-        .onAppear {
-             updater.checkForUpdates()
-        }
+        .onAppear { updater.checkForUpdates() }
     }
 }
 

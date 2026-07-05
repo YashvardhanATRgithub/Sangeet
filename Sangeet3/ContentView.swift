@@ -33,7 +33,6 @@ struct ContentView: View {
                     case .home: HomeView()
                     case .library: LibraryView()
                     case .playlists: PlaylistsView()
-                    case .online: OnlineView()
                     case .settings: SettingsView()
                     }
                 }
@@ -43,6 +42,7 @@ struct ContentView: View {
 
             }
             .overlay(alignment: .bottom) {
+                // Show dock always (YouTube check is removed)
                 FloatingDock(showFullScreen: $showFullScreenPlayer, showQueue: $showQueueSidebar)
                     .padding(.horizontal, 20)
                     .padding(.bottom, 24)
@@ -110,29 +110,15 @@ struct ContentView: View {
                 trackToAddAfterCreation = nil
             }
             Button("Create") {
-                if !newPlaylistName.isEmpty {
-                    libraryManager.createPlaylist(name: newPlaylistName)
-                    
-                    // If we wanted to add a track, do it now (need ID of newly created playlist?
-                    // LibraryManager.createPlaylist is async and doesn't return ID easily here.
-                    // But we can assume it's the latest or find it by name.
-                    // For now, let's just wait a split second or notify User.
-                    if let track = trackToAddAfterCreation {
-                         // We need to wait for playlist to be created.
-                         // Improve LibraryManager to return the created playlist or handle this.
-                         // For now, simple implementation:
-                         Task {
-                             try? await Task.sleep(nanoseconds: 200_000_000) // 200ms
-                             if let playlist = self.libraryManager.playlists.first(where: { $0.name == self.newPlaylistName }) {
-                                 self.libraryManager.addTrackToPlaylist(track, playlist: playlist)
-                             }
-                             await MainActor.run {
-                                 self.newPlaylistName = ""
-                                 self.trackToAddAfterCreation = nil
-                             }
-                         }
-                    } else {
-                        newPlaylistName = ""
+                let name = newPlaylistName.trimmingCharacters(in: .whitespacesAndNewlines)
+                let track = trackToAddAfterCreation
+                newPlaylistName = ""
+                trackToAddAfterCreation = nil
+
+                guard !name.isEmpty else { return }
+                Task {
+                    if let playlist = await libraryManager.createPlaylist(name: name), let track {
+                        libraryManager.addTrackToPlaylist(track, playlist: playlist)
                     }
                 }
             }

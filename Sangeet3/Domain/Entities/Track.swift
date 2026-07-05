@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct Track: Identifiable, Hashable {
+nonisolated struct Track: Identifiable, Hashable {
     let id: UUID
     var title: String
     var artist: String
@@ -15,41 +15,33 @@ struct Track: Identifiable, Hashable {
     var duration: TimeInterval
     var fileURL: URL
     var artworkData: Data?
-    var artworkURL: URL? // For remote or lazy loading
     var isFavorite: Bool
     var playCount: Int
     var lastPlayed: Date?
     var dateAdded: Date
-    
+
     var formattedDuration: String {
         let minutes = Int(duration) / 60
         let seconds = Int(duration) % 60
         return String(format: "%d:%02d", minutes, seconds)
     }
-    
-    /// Returns true if this track is from a remote streaming URL (not a local file)
-    var isRemote: Bool {
-        let scheme = fileURL.scheme?.lowercased() ?? ""
-        return scheme == "http" || scheme == "https" || scheme == "tidal"
+
+    init(id: UUID = UUID(), title: String, artist: String = "Unknown Artist", album: String = "Unknown Album", duration: TimeInterval = 0, fileURL: URL, artworkData: Data? = nil, isFavorite: Bool = false, playCount: Int = 0, lastPlayed: Date? = nil, dateAdded: Date = Date()) {
+        self.id = id; self.title = title; self.artist = artist; self.album = album; self.duration = duration; self.fileURL = fileURL; self.artworkData = artworkData; self.isFavorite = isFavorite; self.playCount = playCount; self.lastPlayed = lastPlayed; self.dateAdded = dateAdded
     }
-    
-    var externalID: String? // For reliable identification (e.g. Tidal ID)
-    
-    init(id: UUID = UUID(), title: String, artist: String = "Unknown Artist", album: String = "Unknown Album", duration: TimeInterval = 0, fileURL: URL, artworkData: Data? = nil, artworkURL: URL? = nil, isFavorite: Bool = false, playCount: Int = 0, lastPlayed: Date? = nil, dateAdded: Date = Date(), externalID: String? = nil) {
-        self.id = id; self.title = title; self.artist = artist; self.album = album; self.duration = duration; self.fileURL = fileURL; self.artworkData = artworkData; self.artworkURL = artworkURL; self.isFavorite = isFavorite; self.playCount = playCount; self.lastPlayed = lastPlayed; self.dateAdded = dateAdded; self.externalID = externalID
-    }
-    
+
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
-        // We generally hash ID for set/dict performance, but == determines view updates
     }
-    
+
+    // Equality drives SwiftUI diffing: include the fields views render so
+    // metadata extraction (title/artwork updates) refreshes rows.
     static func == (lhs: Track, rhs: Track) -> Bool {
         return lhs.id == rhs.id &&
-               lhs.artworkURL == rhs.artworkURL &&
-               lhs.artworkData == rhs.artworkData &&
                lhs.title == rhs.title &&
-               lhs.artist == rhs.artist && 
-               lhs.album == rhs.album
+               lhs.artist == rhs.artist &&
+               lhs.album == rhs.album &&
+               lhs.duration == rhs.duration &&
+               lhs.artworkData == rhs.artworkData
     }
 }

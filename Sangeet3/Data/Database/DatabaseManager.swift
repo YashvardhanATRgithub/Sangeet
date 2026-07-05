@@ -34,11 +34,8 @@ final class DatabaseManager: ObservableObject {
             
             // Create database pool with configuration
             var config = Configuration()
-            config.prepareDatabase { db in
-                // Enable foreign keys
-                db.trace { print("SQL: \($0)") } // Debug logging, remove in production
-            }
-            
+            config.foreignKeysEnabled = true
+
             dbPool = try DatabasePool(path: databaseURL.path, configuration: config)
             
             // Run migrations

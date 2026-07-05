@@ -164,9 +164,9 @@ struct QueueSidebar: View {
                 }
                 .padding(.vertical, 8)
             }
-            .onChange(of: playbackManager.queueIndex) { _, newIndex in
+            .onChange(of: playbackManager.queueIndex) { _, _ in
                 withAnimation {
-                    proxy.scrollTo(playbackManager.queue[safe: newIndex]?.id)
+                    proxy.scrollTo("nowPlaying", anchor: .top)
                 }
             }
         }

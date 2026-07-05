@@ -122,11 +122,6 @@ struct TrackInfoView: View {
             
             if let track = playbackManager.currentTrack {
                 HeartButton(track: track, size: 16, color: SangeetTheme.textSecondary)
-                
-                // Show download button for remote tracks
-                if track.isRemote {
-                    DownloadButton(track: track, size: 16, color: SangeetTheme.textSecondary)
-                }
             }
         }
     }

@@ -31,7 +31,6 @@ struct UniversalSongRow: View {
     
     /// Get file size as formatted string
     var fileSize: String {
-        guard !track.isRemote else { return "Stream" }
         do {
             let resources = try track.fileURL.resourceValues(forKeys: [.fileSizeKey])
             if let size = resources.fileSize {
@@ -327,7 +326,17 @@ class PlaylistMenuData: NSObject {
     
     @objc func deleteTrack(_ sender: NSMenuItem) {
         guard let track = sender.representedObject as? Track else { return }
-        LibraryManager.shared.deleteTrack(track)
+
+        let alert = NSAlert()
+        alert.messageText = "Delete \"\(track.title)\"?"
+        alert.informativeText = "The audio file will be permanently deleted from disk. This cannot be undone."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Delete")
+        alert.addButton(withTitle: "Cancel")
+
+        if alert.runModal() == .alertFirstButtonReturn {
+            LibraryManager.shared.deleteTrack(track)
+        }
     }
     
     @objc func toggleFavorite(_ sender: NSMenuItem) {

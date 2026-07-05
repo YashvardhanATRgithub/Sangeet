@@ -94,9 +94,10 @@ struct PlaylistsView: View {
             TextField("Playlist Name", text: $newPlaylistName)
             Button("Cancel", role: .cancel) { newPlaylistName = "" }
             Button("Create") {
-                if !newPlaylistName.isEmpty {
-                    libraryManager.createPlaylist(name: newPlaylistName)
-                    newPlaylistName = ""
+                let name = newPlaylistName.trimmingCharacters(in: .whitespacesAndNewlines)
+                newPlaylistName = ""
+                if !name.isEmpty {
+                    Task { await libraryManager.createPlaylist(name: name) }
                 }
             }
         }

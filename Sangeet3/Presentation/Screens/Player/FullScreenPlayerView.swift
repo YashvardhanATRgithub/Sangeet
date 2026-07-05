@@ -73,16 +73,9 @@ struct FullScreenPlayerView: View {
                                     .foregroundStyle(SangeetTheme.textSecondary)
                             }
                             
-                            // Heart and Download buttons below metadata
+                            // Heart button below metadata
                             if let track = playbackManager.currentTrack {
-                                HStack(spacing: 16) {
-                                    HeartButton(track: track, size: 24, color: .white.opacity(0.6))
-                                    
-                                    // Show download button for remote tracks
-                                    if track.isRemote {
-                                        DownloadButton(track: track, size: 24)
-                                    }
-                                }
+                                HeartButton(track: track, size: 24, color: .white.opacity(0.6))
                             }
                         }
                         .frame(maxWidth: 350)

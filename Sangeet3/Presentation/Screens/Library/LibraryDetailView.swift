@@ -103,6 +103,10 @@ struct LibraryDetailView: View {
         .onAppear {
             loadTracks()
         }
+        .onChange(of: libraryManager.tracks) { _, _ in
+            // Keep in sync while background metadata extraction updates the library
+            loadTracks()
+        }
     }
     
     private func loadTracks() {

@@ -67,12 +67,11 @@ final class BASSEngine: ObservableObject {
     static let shared = BASSEngine()
     
     private init() {
-        // Load saved volume
-        let saved = UserDefaults.standard.float(forKey: "audioVolume")
-        if saved > 0 {
-            volume = saved
+        // Load saved volume (0 is a valid saved value: muted)
+        if UserDefaults.standard.object(forKey: "audioVolume") != nil {
+            volume = UserDefaults.standard.float(forKey: "audioVolume")
         }
-        
+
         initializeBASSEngine()
         observeNotifications()
     }
@@ -101,13 +100,6 @@ final class BASSEngine: ObservableObject {
         print("[BASSEngine] BASS initialized on device \(deviceNumber) at \(sampleRate)Hz")
         
         BASS_SetConfig(DWORD(BASS_CONFIG_FLOATDSP), 1)
-        
-        // Network Buffering for smoother seeking
-        // Set buffer to 15000ms (15 seconds) and read-ahead
-        BASS_SetConfig(DWORD(BASS_CONFIG_NET_BUFFER), 15000)
-        BASS_SetConfig(DWORD(BASS_CONFIG_NET_READTIMEOUT), 10000)
-        BASS_SetConfig(DWORD(BASS_CONFIG_NET_PREBUF), 30) // Buffer 30% before starting
-        print("[BASSEngine] Network buffer set to 15s")
     }
     
     private func observeNotifications() {
@@ -295,27 +287,9 @@ final class BASSEngine: ObservableObject {
         self.onTrackEnd = nil
         stop()
         self.onTrackEnd = onEnd
-        
-        // Create stream
-        // Create stream
-        if url.isFileURL {
-            currentStream = BASS_StreamCreateFile(
-                BOOL32(truncating: false),
-                url.path,
-                0,
-                0,
-                DWORD(BASS_STREAM_PRESCAN) | DWORD(BASS_SAMPLE_FLOAT)
-            )
-        } else {
-            currentStream = BASS_StreamCreateURL(
-                url.absoluteString,
-                0,
-                DWORD(BASS_STREAM_PRESCAN) | DWORD(BASS_SAMPLE_FLOAT),
-                nil,
-                nil
-            )
-        }
-        
+
+        currentStream = createStream(url: url)
+
         if currentStream == 0 {
              throw NSError(domain: "BASSEngine", code: Int(BASS_ErrorGetCode()), userInfo: nil)
         }
@@ -360,31 +334,13 @@ final class BASSEngine: ObservableObject {
             flags |= DWORD(BASS_SAMPLE_FLOAT)
         }
         
-        // Create stream
-        let stream: HSTREAM
-        
-        if url.isFileURL {
-            stream = BASS_StreamCreateFile(
-                BOOL32(truncating: false),
-                url.path,
-                0,
-                0,
-                flags
-            )
-        } else {
-            // Remote URL
-            // Ensure flags don't include PRESCAN if it causes issues, but for now keep consistent
-            // BASS_StreamCreateURL takes (url, offset, flags, proc, user)
-            stream = BASS_StreamCreateURL(
-                url.absoluteString,
-                0,
-                flags,
-                nil,
-                nil
-            )
-        }
-        
-        return stream
+        return BASS_StreamCreateFile(
+            BOOL32(truncating: false),
+            url.path,
+            0,
+            0,
+            flags
+        )
     }
     
     // MARK: - Legacy / Helpers
@@ -433,9 +389,9 @@ final class BASSEngine: ObservableObject {
         currentTime = 0
         
         BASS_ChannelSetAttribute(currentStream, DWORD(BASS_ATTRIB_VOL), volume * replayGainFactor)
-        
-        // End sync
-        BASS_ChannelSetSync(
+
+        // End sync (stored so a later crossfade can detach it from the dying stream)
+        currentSync = BASS_ChannelSetSync(
             currentStream,
             DWORD(BASS_SYNC_END),
             0,

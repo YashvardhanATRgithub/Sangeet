@@ -7,23 +7,40 @@
 
 import SwiftUI
 import Combine
+import AppKit
+
+// MARK: - App Delegate (handles files opened from Finder / "Open With")
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func application(_ application: NSApplication, open urls: [URL]) {
+        let audioURLs = urls.filter { LibraryManager.isSupportedAudioFile($0) }
+        guard !audioURLs.isEmpty else { return }
+
+        Task { @MainActor in
+            await LibraryManager.shared.playExternalFiles(audioURLs)
+        }
+    }
+}
 
 @main
 struct Sangeet3App: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var appState = AppState()
     @StateObject private var playbackManager = PlaybackManager.shared
     @StateObject private var libraryManager = LibraryManager.shared
     @StateObject private var themeManager = ThemeManager.shared
-    
+
     var body: some Scene {
-        WindowGroup("Sangeet") {
+        // Single-window app: `Window` (unlike WindowGroup) never spawns extra
+        // windows when files are opened from Finder.
+        Window("Sangeet", id: "main") {
             ContentView()
                 .environmentObject(appState)
                 .environmentObject(playbackManager)
                 .environmentObject(libraryManager)
                 .environmentObject(themeManager)
                 .preferredColorScheme(.dark)
-                .onAppear {
+                .task {
+                    // Best-effort update check; silently no-ops when offline
                     UpdateChecker.shared.checkForUpdates()
                 }
         }
@@ -31,33 +48,33 @@ struct Sangeet3App: App {
         .windowResizability(.contentMinSize)
         .commands {
             CommandGroup(replacing: .newItem) { }
-            
+
             CommandMenu("Playback") {
                 Button("Play/Pause") {
                     playbackManager.togglePlayPause()
                 }
                 .keyboardShortcut(.space, modifiers: [])
-                
+
                 Button("Next Track") {
                     playbackManager.next(manualSkip: true)
                 }
                 .keyboardShortcut(.rightArrow, modifiers: .command)
-                
+
                 Button("Previous Track") {
                     playbackManager.previous()
                 }
                 .keyboardShortcut(.leftArrow, modifiers: .command)
-                
+
                 // Arrow key seeking is handled by custom event monitor in ContentView
                 // to allow normal text editing in search fields
-                
+
                 Divider()
-                
+
                 Button("Increase Volume") {
                     playbackManager.setVolume(min(playbackManager.volume + 0.05, 1.0))
                 }
                 .keyboardShortcut(.upArrow, modifiers: .command)
-                
+
                 Button("Decrease Volume") {
                     playbackManager.setVolume(max(playbackManager.volume - 0.05, 0.0))
                 }
@@ -75,24 +92,23 @@ class AppState: ObservableObject {
     @Published var playlistNavigationPath: [PlaylistRecord] = []
     @Published var libraryNavigationPath: [LibraryPathItem] = []
     @Published var isLyricsVisible: Bool = false // Persistent lyrics state
-    
+
     enum Tab: String, CaseIterable {
         case home = "Home"
         case library = "Library"
         case playlists = "Playlists"
-        case online = "Online"
         case settings = "Settings"
-        
+
         var icon: String {
             switch self {
             case .home: return "house.fill"
             case .library: return "books.vertical.fill"
             case .playlists: return "music.note.list"
-            case .online: return "globe"
             case .settings: return "gearshape.fill"
             }
         }
     }
+
     func changeTab(to tab: Tab) {
         // Reset all navigation paths when switching tabs
         homeNavigationPath.removeAll()
@@ -100,7 +116,7 @@ class AppState: ObservableObject {
         libraryNavigationPath.removeAll()
         currentTab = tab
     }
-    
+
     func navigateBack() {
         switch currentTab {
         case .home:
@@ -109,7 +125,7 @@ class AppState: ObservableObject {
             if !libraryNavigationPath.isEmpty { libraryNavigationPath.removeLast() }
         case .playlists:
             if !playlistNavigationPath.isEmpty { playlistNavigationPath.removeLast() }
-        case .online, .settings:
+        case .settings:
             break
         }
     }
@@ -120,74 +136,97 @@ enum LibraryPathItem: Hashable {
     case artist(String) // Artist name
 }
 
-// MARK: - Update Checker (Inlined)
-import AppKit
+// MARK: - Update Checker
+// Checks GitHub releases for a newer version. Fails silently when offline.
 import UserNotifications
 
-struct GitHubRelease: Codable {
-    let tag_name: String
-    let html_url: String
-    let body: String
-    let published_at: String
-}
+@MainActor
+final class UpdateChecker: ObservableObject {
 
-class UpdateChecker: ObservableObject {
     static let shared = UpdateChecker()
-    
-    @Published var updateAvailable: Bool = false
-    @Published var latestVersion: String = ""
-    @Published var releaseNotes: String = ""
+    private init() {}
+
+    @Published var updateAvailable = false
+    @Published var latestVersion = ""
+    @Published var releaseNotes = ""
     @Published var releaseURL: URL?
-    
-    // Dynamically fetch current version
+    @Published var isChecking = false
+
+    private static let releasesAPI = "https://api.github.com/repos/YashvardhanATRgithub/Sangeet/releases/latest"
+
     private var currentVersion: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
     }
-    
+
+    private struct GitHubRelease: Codable {
+        let tag_name: String
+        let html_url: String
+        let body: String?
+    }
+
     func checkForUpdates() {
-        guard let url = URL(string: "https://api.github.com/repos/YashvardhanATRgithub/Sangeet/releases/latest") else { return }
-        
-        URLSession.shared.dataTask(with: url) { data, _, error in
-            guard let data = data, error == nil else { return }
-            
-            do {
-                let release = try JSONDecoder().decode(GitHubRelease.self, from: data)
-                let latestTag = release.tag_name.replacingOccurrences(of: "v", with: "")
-                
-                print("[UpdateChecker] Latest: \(latestTag), Current: \(self.currentVersion)")
-                
-                DispatchQueue.main.async {
-                    if self.isVersion(latestTag, newThan: self.currentVersion) {
-                        self.latestVersion = latestTag
-                        self.releaseNotes = release.body
-                        self.releaseURL = URL(string: release.html_url)
-                        self.updateAvailable = true
-                        
-                        // Send Notification
-                        self.sendUpdateNotification(version: latestTag)
-                    }
-                }
-            } catch {
-                print("Update Check Failed: \(error)")
+        guard !isChecking else { return }
+        Task { await performCheck() }
+    }
+
+    private func performCheck() async {
+        isChecking = true
+        defer { isChecking = false }
+
+        guard let url = URL(string: Self.releasesAPI) else { return }
+
+        var request = URLRequest(url: url)
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.setValue("Sangeet/\(currentVersion)", forHTTPHeaderField: "User-Agent")
+        request.timeoutInterval = 15
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return }
+
+            let release = try JSONDecoder().decode(GitHubRelease.self, from: data)
+            let latest = release.tag_name.hasPrefix("v")
+                ? String(release.tag_name.dropFirst())
+                : release.tag_name
+
+            if latest.compare(currentVersion, options: .numeric) == .orderedDescending {
+                latestVersion = latest
+                releaseNotes = release.body ?? ""
+                releaseURL = URL(string: release.html_url)
+                updateAvailable = true
+                print("[UpdateChecker] Update available: v\(latest) (current v\(currentVersion))")
+                notifyOncePerVersion(latest)
+            } else {
+                updateAvailable = false
+                print("[UpdateChecker] Up to date (current v\(currentVersion), latest v\(latest))")
             }
-        }.resume()
+        } catch {
+            // Offline or API unavailable - update checking is best-effort
+            print("[UpdateChecker] Check skipped: \(error.localizedDescription)")
+        }
     }
-    
-    // Simple semver compare
-    private func isVersion(_ newVer: String, newThan oldVer: String) -> Bool {
-        return newVer.compare(oldVer, options: .numeric) == .orderedDescending
+
+    func openReleasePage() {
+        if let url = releaseURL {
+            NSWorkspace.shared.open(url)
+        }
     }
-    
-    private func sendUpdateNotification(version: String) {
-        let content = UNMutableNotificationContent()
-        content.title = "Update Available"
-        content.body = "Sangeet v\(version) is now available. Click to download."
-        content.sound = .default
-        
-        // Request permission implicitly by adding
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
-        
-        let request = UNNotificationRequest(identifier: "UpdateAvailable", content: content, trigger: nil)
-        UNUserNotificationCenter.current().add(request)
+
+    /// Posts a user notification the first time a given version is seen,
+    /// so users aren't re-notified on every launch.
+    private func notifyOncePerVersion(_ version: String) {
+        let key = "lastNotifiedUpdateVersion"
+        guard UserDefaults.standard.string(forKey: key) != version else { return }
+        UserDefaults.standard.set(version, forKey: key)
+
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            guard granted else { return }
+            let content = UNMutableNotificationContent()
+            content.title = "Update Available"
+            content.body = "Sangeet v\(version) is out. Click to download."
+            content.sound = .default
+            center.add(UNNotificationRequest(identifier: "UpdateAvailable", content: content, trigger: nil))
+        }
     }
 }

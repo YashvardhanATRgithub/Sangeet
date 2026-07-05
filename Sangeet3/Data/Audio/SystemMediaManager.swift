@@ -22,46 +22,8 @@ class SystemMediaManager {
     var onPrevious: (() -> Void)?
     var onSeek: ((Double) -> Void)?
     
-    private init() {
-        setupRemoteCommands()
-    }
-    
-    private func setupRemoteCommands() {
-        // Play Command
-        commandCenter.playCommand.isEnabled = true
-        commandCenter.playCommand.addTarget { [weak self] _ in
-            self?.onPlay?()
-            return .success
-        }
-        
-        // Pause Command
-        commandCenter.pauseCommand.isEnabled = true
-        commandCenter.pauseCommand.addTarget { [weak self] _ in
-            self?.onPause?()
-            return .success
-        }
-        
-        // Toggle Play/Pause Command
-        commandCenter.togglePlayPauseCommand.isEnabled = true
-        commandCenter.togglePlayPauseCommand.addTarget { [weak self] _ in
-            // Use current state to decide, or just let PlaybackManager toggle
-            // For simplicity, we can't easily know state here without query, 
-            // but usually Play/Pause separate commands are better if predictable.
-            // Mac media key F8 usually sends Play or Pause depending on state, 
-            // or Toggle if handled. Using separate handlers allows UI to drive it.
-            // But F8 specifically triggers togglePlayPause usually.
-            // We'll map it to onPlay/onPause if we knew state, but simpler to have an onToggle or just call onPlay/onPause based on internal tracking?
-            // Actually, PlaybackManager should handle "Toggle".
-            // Let's assume onPlay implies "Resume" and if playing "Pause".
-            // Ideally we expose onToggle.
-            return .commandFailed 
-        }
-        // Since we didn't define onToggle, we will rely on Play/Pause for now.
-        // Actually, for F8 to work reliably, we need togglePlayPause.
-        // Let's modify the class to support it properly or map it.
-        // Re-implementing correctly below.
-    }
-    
+    private init() {}
+
     func setup(onPlay: @escaping () -> Void,
                onPause: @escaping () -> Void,
                onNext: @escaping () -> Void,
@@ -92,16 +54,10 @@ class SystemMediaManager {
             return .success
         }
         
-        // Toggle (F8)
+        // Toggle (F8 / media key)
         commandCenter.togglePlayPauseCommand.isEnabled = true
         commandCenter.togglePlayPauseCommand.removeTarget(nil)
-        commandCenter.togglePlayPauseCommand.addTarget { [weak self] event in
-            // We need to know current state to toggle intelligently,
-            // OR the closure handles the toggle.
-            // Usually F8 triggers this.
-            // We'll delegate to a toggle handler or infer from PlaybackManager if we had a ref.
-            // For now, let's assume the caller will treat onPlay as "Toggle" if needed? 
-            // No, that's ambiguous. let's add onToggle.
+        commandCenter.togglePlayPauseCommand.addTarget { [weak self] _ in
             self?.onTogglePlayback?()
             return .success
         }

@@ -15,7 +15,7 @@ import GRDB
 /// Manages music library with GRDB persistence
 @MainActor
 final class LibraryManager: ObservableObject {
-    
+
     // MARK: - Published State
     @Published var tracks: [Track] = []
     @Published var albums: [String: [Track]] = [:]
@@ -23,56 +23,68 @@ final class LibraryManager: ObservableObject {
     @Published var folders: [URL] = []
     @Published var isScanning = false
     @Published var scanProgress: String = ""
-    
+
     // Derived collections
     @Published var recentlyAddedSongs: [Track] = []
     @Published var mostListenedSongs: [Track] = []
     @Published var recentlyPlayedSongs: [Track] = []
-    
+
     // MARK: - Supported Formats
-    private let supportedExtensions: Set<String> = [
+    nonisolated static let supportedExtensions: Set<String> = [
         "mp3", "m4a", "aac", "flac", "wav", "aiff", "aif", "caf", "ogg", "opus"
     ]
-    
+
+    nonisolated static func isSupportedAudioFile(_ url: URL) -> Bool {
+        url.isFileURL && supportedExtensions.contains(url.pathExtension.lowercased())
+    }
+
     // MARK: - Singleton
     static let shared = LibraryManager()
-    
+
     private init() {
         Task { await setupLibrary() }
-        
-        // Listen for new downloads to instantly update UI
+
+        // Re-sync when the user returns to the app: catches files added to
+        // subfolders, which the per-folder monitors can't observe.
         NotificationCenter.default.addObserver(
-            forName: .init("DownloadDidFinish"),
+            forName: NSApplication.didBecomeActiveNotification,
             object: nil,
             queue: .main
-        ) { [weak self] notification in
-            guard let self = self else { return }
-            // Quickly re-scan or add to tracks manually if we have full metadata
-            // For now, rely on scanAllFolders which is triggered by DownloadManager, 
-            // but we can also force a UI refresh of 'recentlyAdded' here if needed.
-            // The isScanning flag will handle some UI state.
-            
-            // Just ensure we notify observers
-            self.objectWillChange.send()
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, !self.folders.isEmpty else { return }
+                await self.scanAllFolders()
+            }
         }
     }
-    
+
     // MARK: - Database Loading
-    
+
     private func setupLibrary() async {
-        // Load initial folders and tracks
         // Load folders from DB
         let folderRecords = try? DatabaseManager.shared.read { db in
             try FolderRecord.fetchAll(db)
         }
-        
+
         var resolvedFolders: [URL] = []
         for record in folderRecords ?? [] {
             if let bookmark = record.bookmark {
                 var isStale = false
-                if let url = try? URL(resolvingBookmarkData: bookmark, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &isStale), !isStale {
+                if let url = try? URL(resolvingBookmarkData: bookmark, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &isStale) {
+                    // Hold security-scoped access for the app's lifetime.
+                    // Without this the sandbox blocks every file under the
+                    // folder after a relaunch (playback, scanning, monitoring).
+                    beginPersistentAccess(url)
                     resolvedFolders.append(url)
-                    // Start monitoring
+                    startMonitoring(folder: url)
+                    // Refresh stale bookmarks so access keeps working next launch
+                    if isStale {
+                        refreshBookmark(for: url)
+                    }
+                } else {
+                    // Bookmark failed to resolve; fall back to the stored path
+                    let url = record.toURL()
+                    resolvedFolders.append(url)
                     startMonitoring(folder: url)
                 }
             } else {
@@ -81,95 +93,65 @@ final class LibraryManager: ObservableObject {
                 startMonitoring(folder: url)
             }
         }
-        
-        await MainActor.run {
-            self.folders = resolvedFolders
-        }
-        
+
+        self.folders = resolvedFolders
+
         // Load tracks from database
         let trackRecords = try? DatabaseManager.shared.read { db in
             try TrackRecord.fetchAll(db: db)
         }
-        
-        await MainActor.run {
-            self.tracks = trackRecords?.map { $0.toTrack() } ?? []
-            self.rebuildIndexes()
-        }
-        
-        // Always scan folders to detect new files
+
+        self.tracks = trackRecords?.map { $0.toTrack() } ?? []
+        self.tracks.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        rebuildIndexes()
+
+        await loadPlaylists()
+
+        // Scan folders to detect new/removed files
         if !folders.isEmpty {
-            // Run in detached task to avoid blocking main thread initialization
             Task.detached(priority: .utility) { [weak self] in
                 await self?.scanAllFolders()
             }
         }
-        
-        await loadPlaylists() // Ensure playlists are loaded
-        
-        await MainActor.run {
-            self.loadInitialTrendingCache()
-        }
     }
-    
 
-    
-    // MARK: - Helper Methods
-    
-    /// Check if a track exists in library with fuzzy matching
-    func hasTrack(title: String, artist: String) -> Bool {
-        // 1. Try exact match (fast)
-        let exactMatch = tracks.contains {
-            $0.title.caseInsensitiveCompare(title) == .orderedSame &&
-            $0.artist.caseInsensitiveCompare(artist) == .orderedSame &&
-            !$0.isRemote
-        }
-        if exactMatch { return true }
-        
-        // 2. Fuzzy match
-        // Often Tidal titles have "(feat. X)" or "Remastered" that local files might miss or have differently
-        // Or "The Beatles" vs "Beatles"
-        
-        let targetTitle = sanitizeString(title)
-        let targetArtist = sanitizeString(artist)
-        
-        return tracks.contains { local in
-            if local.isRemote { return false }
-            
-            let localTitle = sanitizeString(local.title)
-            let localArtist = sanitizeString(local.artist)
-            
-            // Check if one contains the other (e.g. "Orbit" inside "Orbit (Remix)")
-            let titleMatch = localTitle.contains(targetTitle) || targetTitle.contains(localTitle)
-            let artistMatch = localArtist.contains(targetArtist) || targetArtist.contains(localArtist)
-            
-            return titleMatch && artistMatch
+    /// Folders we hold security-scoped access to (kept for the app's lifetime)
+    private var activeScopedFolders: Set<URL> = []
+
+    private func beginPersistentAccess(_ url: URL) {
+        guard !activeScopedFolders.contains(url) else { return }
+        if url.startAccessingSecurityScopedResource() {
+            activeScopedFolders.insert(url)
         }
     }
-    
-    private func sanitizeString(_ str: String) -> String {
-        var s = str.lowercased()
-        
-        // Remove parens and brackets: "Song (From X)" -> "Song "
-        s = s.replacingOccurrences(of: "\\(.*?\\)", with: "", options: .regularExpression)
-        s = s.replacingOccurrences(of: "\\[.*?\\]", with: "", options: .regularExpression)
-        
-        // Remove common suffixes often found in titles
-        // "Song feat. X", "Song from X", "Song Remix", "Song Version"
-        // Note: We use a loop or multiple replacements to catch them all.
-        // The regex ` (feat\\.|from|track|remix|version).*` is good but might miss edge cases.
-        s = s.replacingOccurrences(of: " feat\\..*", with: "", options: .regularExpression)
-        s = s.replacingOccurrences(of: " from .*", with: "", options: .regularExpression)
-        s = s.replacingOccurrences(of: " remix.*", with: "", options: .regularExpression)
-        s = s.replacingOccurrences(of: " version.*", with: "", options: .regularExpression)
-        s = s.replacingOccurrences(of: "the ", with: "")
-        
-        // Remove non-alphanumeric (keep spaces for splitting?) No, simple filter is better.
-        // "Aayi Nai" -> "aayinai"
-        let alphanum = s.filter { $0.isLetter || $0.isNumber }
-        
-        return alphanum.isEmpty ? s : alphanum
+
+    private func endPersistentAccess(_ url: URL) {
+        if activeScopedFolders.remove(url) != nil {
+            url.stopAccessingSecurityScopedResource()
+        }
     }
-    
+
+    private func refreshBookmark(for url: URL) {
+        let accessing = url.startAccessingSecurityScopedResource()
+        defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+
+        guard let bookmarkData = try? url.bookmarkData(
+            options: .withSecurityScope,
+            includingResourceValuesForKeys: nil,
+            relativeTo: nil
+        ) else { return }
+
+        let path = url.path
+        DatabaseManager.shared.writeAsync { db in
+            try db.execute(
+                sql: "UPDATE folder SET bookmark = ? WHERE path = ?",
+                arguments: [bookmarkData, path]
+            )
+        }
+    }
+
+    // MARK: - Folders
+
     func addFolder() {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
@@ -177,29 +159,22 @@ final class LibraryManager: ObservableObject {
         panel.allowsMultipleSelection = true
         panel.message = "Select music folder(s) to import"
         panel.prompt = "Add Folder"
-        
+
         if panel.runModal() == .OK {
             Task {
                 for url in panel.urls {
-                    if !folders.contains(url) {
-                        await addFolderToDatabase(url)
-                        folders.append(url)
-                        startMonitoring(folder: url) // Watch for changes
-                        await scanFolder(url)
-                    }
+                    await addFolder(url: url)
                 }
             }
         }
     }
-    
+
     // Create default ~/Music/Sangeet folder
     func createDefaultFolder() async -> URL? {
-        // 1. Get Music Directory
         guard let musicDir = FileManager.default.urls(for: .musicDirectory, in: .userDomainMask).first else { return nil }
-        
+
         let target = musicDir.appendingPathComponent("Sangeet")
-        
-        // 2. Create if needed
+
         if !FileManager.default.fileExists(atPath: target.path) {
             do {
                 try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
@@ -208,39 +183,33 @@ final class LibraryManager: ObservableObject {
                 return nil
             }
         }
-        
-        // 3. Register
+
         if !folders.contains(target) {
             await addFolder(url: target)
         }
-        
+
         return target
     }
-    
-    // Expose programmatic add folder
+
+    // Programmatic add folder
     func addFolder(url: URL) async {
-        if !folders.contains(url) {
-            await addFolderToDatabase(url)
-            
-            await MainActor.run {
-                if !self.folders.contains(url) {
-                     self.folders.append(url)
-                }
-            }
-            
-            startMonitoring(folder: url)
-            await scanFolder(url)
-        }
+        guard !folders.contains(url) else { return }
+
+        await addFolderToDatabase(url)
+        beginPersistentAccess(url)
+        folders.append(url)
+        startMonitoring(folder: url)
+        await scanFolder(url)
     }
-    
+
     private func addFolderToDatabase(_ url: URL) async {
         do {
-            let bookmarkData = try url.bookmarkData(
+            let bookmarkData = try? url.bookmarkData(
                 options: .withSecurityScope,
                 includingResourceValuesForKeys: nil,
                 relativeTo: nil
             )
-            
+
             let record = FolderRecord(url: url, bookmark: bookmarkData)
             _ = try DatabaseManager.shared.write { db in
                 try record.insert(db)
@@ -249,196 +218,191 @@ final class LibraryManager: ObservableObject {
             print("[LibraryManager] Add folder error: \(error)")
         }
     }
-    
+
     func removeFolder(_ url: URL) {
+        let prefix = url.path.hasSuffix("/") ? url.path : url.path + "/"
+
         folders.removeAll { $0 == url }
-        tracks.removeAll { $0.fileURL.path.hasPrefix(url.path) }
+        tracks.removeAll { $0.fileURL.path.hasPrefix(prefix) || $0.fileURL.path == url.path }
         rebuildIndexes()
-        
-        stopMonitoring(folder: url) // Stop watching
-        
-        
-        // Remove from database
-        do {
-            try DatabaseManager.shared.write { db in
-                try FolderRecord.delete(path: url.path, db: db)
-                try TrackRecord.deleteByFolder(url.path, db: db)
+
+        stopMonitoring(folder: url)
+        endPersistentAccess(url)
+
+        // Remove from database (all tracks under the folder, including subfolders)
+        let folderPath = url.path
+        DatabaseManager.shared.writeAsync { db in
+            try FolderRecord.delete(path: folderPath, db: db)
+            let records = try TrackRecord.fetchAll(db: db)
+            let idsToDelete = records
+                .filter { $0.filePath.hasPrefix(prefix) || $0.filePath == folderPath }
+                .map { $0.id }
+            if !idsToDelete.isEmpty {
+                try TrackRecord
+                    .filter(idsToDelete.contains(Column("id")))
+                    .deleteAll(db)
             }
-        } catch {
-            print("[LibraryManager] Remove folder error: \(error)")
         }
     }
-    
+
     // MARK: - Folder Monitoring
-    
+
     private var folderMonitors: [URL: FolderMonitor] = [:]
-    
+    private var pendingFolderScans: Set<URL> = []
+
     private func startMonitoring(folder: URL) {
-        // Stop existing if any
         stopMonitoring(folder: folder)
-        
+
         let monitor = FolderMonitor(url: folder)
         monitor.onDidChange = { [weak self] in
-            // Debounce scan: Wait 2 seconds
-            // In a real app, use a Debouncer. For now, we'll just trigger task.
-            // DispatchSource already coalesces events somewhat.
-            Task {
-                try? await Task.sleep(nanoseconds: 2 * 1_000_000_000)
-                await self?.scanFolder(folder)
+            Task { @MainActor [weak self] in
+                self?.scheduleScan(for: folder)
             }
         }
         monitor.start()
         folderMonitors[folder] = monitor
     }
-    
+
+    /// Debounces file-system events: at most one pending scan per folder.
+    private func scheduleScan(for folder: URL) {
+        guard !pendingFolderScans.contains(folder) else { return }
+        pendingFolderScans.insert(folder)
+
+        Task {
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            pendingFolderScans.remove(folder)
+            await scanFolder(folder)
+        }
+    }
+
     private func stopMonitoring(folder: URL) {
         folderMonitors[folder]?.stop()
         folderMonitors[folder] = nil
     }
 
     // MARK: - Scanning
-    
+
+    private var foldersBeingScanned: Set<URL> = []
+
     func scanAllFolders() async {
-        await MainActor.run {
-            self.isScanning = true
-            self.scanProgress = "Syncing library..."
-        }
-        
+        isScanning = true
+        scanProgress = "Syncing library..."
+
         for folder in folders {
             await scanFolder(folder)
         }
-        
-        await MainActor.run {
-            self.isScanning = false
-            self.scanProgress = ""
-        }
+
+        isScanning = false
+        scanProgress = ""
     }
-    
+
     private func scanFolder(_ url: URL) async {
-        await MainActor.run {
-            self.isScanning = true
-        }
-        
+        // Serialize scans per folder to avoid duplicate inserts
+        guard !foldersBeingScanned.contains(url) else { return }
+        foldersBeingScanned.insert(url)
+        defer { foldersBeingScanned.remove(url) }
+
+        isScanning = true
+        defer { isScanning = false }
+
         let accessing = url.startAccessingSecurityScopedResource()
         defer { if accessing { url.stopAccessingSecurityScopedResource() } }
-        
-        // 1. Get ALL DB tracks for this folder (for pruning)
+
+        let prefix = url.path.hasSuffix("/") ? url.path : url.path + "/"
+
+        // 1. All DB tracks under this folder (including subfolders) for pruning
         let dbTracks = (try? DatabaseManager.shared.read { db in
-            try TrackRecord
-                .filter(Column("folderPath") == url.path)
-                .fetchAll(db)
-        }) ?? []
-        
+            try TrackRecord.fetchAll(db: db)
+        })?.filter { $0.filePath.hasPrefix(prefix) } ?? []
+
         var dbPaths = Set(dbTracks.map { $0.filePath })
-        
-        // 2. Scan File System
-        let fileManager = FileManager.default
-        print("[LibraryManager] enumerating: \(url.path)")
-        
-        guard let enumerator = fileManager.enumerator(
-            at: url,
-            includingPropertiesForKeys: [.isRegularFileKey, .creationDateKey],
-            options: [.skipsHiddenFiles]
-        ) else {
-            print("[LibraryManager] Failed to create enumerator for \(url.path)")
-            return
-        }
-        
-        // Manual iteration to debug
-        var allFiles: [URL] = []
-        for case let fileURL as URL in enumerator {
-            allFiles.append(fileURL)
-        }
-        
-        print("[LibraryManager] Scanning \(url.path): Found \(allFiles.count) files")
-        if allFiles.isEmpty {
-             // Fallback check
-             let contents = try? fileManager.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)
-             print("[LibraryManager] Fallback check: contentsOfDirectory found \(contents?.count ?? 0) items")
-        }
-        
+
+        // Paths already loaded in memory (from any folder) - prevents duplicates
+        let inMemoryPaths = Set(tracks.map { $0.fileURL.path })
+
+        // 2. Scan file system
+        let audioFiles = enumerateAudioFiles(in: url)
+
         var newTracks: [Track] = []
-        var foundPaths: Set<String> = []
-        
-        for fileURL in allFiles {
-            let ext = fileURL.pathExtension.lowercased()
-            // Debug print for first few files
-            if foundPaths.count < 3 { print("[LibraryManager] Checking: \(fileURL.lastPathComponent) (\(ext))") }
-            
-            guard supportedExtensions.contains(ext) else { continue }
-            
+
+        for fileURL in audioFiles {
             let path = fileURL.path
-            foundPaths.insert(path)
-            
-            // If exists in DB, remove from dbPaths (so remaining dbPaths are deletions)
+
+            // Known in DB: not a deletion, not new
             if dbPaths.contains(path) {
                 dbPaths.remove(path)
                 continue
             }
-            
-            // It's a new track
-            let track = createTrackFast(from: fileURL)
-            newTracks.append(track)
-            print("[LibraryManager] Created new track: \(track.title)")
+
+            // Already loaded in memory (e.g. overlapping folders)
+            guard !inMemoryPaths.contains(path) else { continue }
+
+            newTracks.append(createTrackFast(from: fileURL))
         }
-        
-        // 3. Process Deletions (Pruning)
-        // dbPaths now contains only paths that are in DB but NOT in File System
+
+        // 3. Prune deletions: dbPaths now contains files that no longer exist
         if !dbPaths.isEmpty {
-            await MainActor.run {
-                // Remove from memory
-                self.tracks.removeAll { dbPaths.contains($0.fileURL.path) }
-            }
-            // Remove from DB
+            let pathsToRemove = dbPaths
+            tracks.removeAll { pathsToRemove.contains($0.fileURL.path) }
+
             DatabaseManager.shared.writeAsync { db in
                 try TrackRecord
-                    .filter(dbPaths.contains(Column("filePath")))
+                    .filter(pathsToRemove.contains(Column("filePath")))
                     .deleteAll(db)
             }
-            print("[LibraryManager] Pruned \(dbPaths.count) deleted songs from \(url.lastPathComponent)")
         }
-        
-        // 4. Process Additions
+
+        // 4. Additions
         if !newTracks.isEmpty {
-            await MainActor.run {
-                self.tracks.append(contentsOf: newTracks)
-                // Sort by Title for now; Date Added view handles its own sort
-                self.tracks.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
-                self.rebuildIndexes()
-            }
-            
-            // Save to database
+            tracks.append(contentsOf: newTracks)
+            tracks.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+
+            let records = newTracks.map { TrackRecord(from: $0) }
             DatabaseManager.shared.writeAsync { db in
-                for track in newTracks {
-                    try TrackRecord(from: track).insert(db)
+                for record in records {
+                    try record.save(db, onConflict: .replace)
                 }
             }
-            
-            print("[LibraryManager] Added \(newTracks.count) new songs from \(url.lastPathComponent)")
-            
+
             // Background metadata extraction
+            let tracksToExtract = newTracks
             Task.detached(priority: .background) { [weak self] in
-                await self?.extractMetadataInBackground(for: newTracks)
+                await self?.extractMetadataInBackground(for: tracksToExtract)
             }
         }
-        
-        // Update indexes if we deleted stuff
+
         if !dbPaths.isEmpty || !newTracks.isEmpty {
-            await MainActor.run { self.rebuildIndexes() }
-        }
-        
-        await MainActor.run {
-            self.isScanning = false
+            rebuildIndexes()
         }
     }
-    
-    private func createTrackFast(from url: URL) -> Track {
+
+    /// Synchronous recursive enumeration of supported audio files.
+    nonisolated private func enumerateAudioFiles(in url: URL) -> [URL] {
+        guard let enumerator = FileManager.default.enumerator(
+            at: url,
+            includingPropertiesForKeys: [.isRegularFileKey, .creationDateKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            print("[LibraryManager] Failed to enumerate \(url.path)")
+            return []
+        }
+
+        var files: [URL] = []
+        for case let fileURL as URL in enumerator {
+            if Self.supportedExtensions.contains(fileURL.pathExtension.lowercased()) {
+                files.append(fileURL)
+            }
+        }
+        return files
+    }
+
+    nonisolated private func createTrackFast(from url: URL) -> Track {
         let filename = url.deletingPathExtension().lastPathComponent
         let parts = filename.components(separatedBy: " - ")
-        
+
         let title: String
         let artist: String
-        
+
         if parts.count >= 2 {
             artist = parts[0].trimmingCharacters(in: .whitespaces)
             title = parts.dropFirst().joined(separator: " - ").trimmingCharacters(in: .whitespaces)
@@ -446,259 +410,171 @@ final class LibraryManager: ObservableObject {
             title = filename
             artist = "Unknown Artist"
         }
-        
+
         let album = url.deletingLastPathComponent().lastPathComponent
-        
-        // Get Creation Date for correct "Recently Added" sorting
+
+        // Use file creation date for correct "Recently Added" sorting
         var dateAdded = Date()
         if let resources = try? url.resourceValues(forKeys: [.creationDateKey]),
            let creationDate = resources.creationDate {
             dateAdded = creationDate
         }
-        
+
         return Track(
             title: title,
             artist: artist,
             album: album,
             duration: 0,
             fileURL: url,
-            dateAdded: dateAdded // Use actual file creation date
+            dateAdded: dateAdded
         )
     }
-    
+
     // MARK: - Metadata Extraction
-    
+
     private func extractMetadataInBackground(for newTracks: [Track]) async {
         for track in newTracks {
             let accessing = track.fileURL.startAccessingSecurityScopedResource()
             defer { if accessing { track.fileURL.stopAccessingSecurityScopedResource() } }
-            
+
             let metadata = await MetadataExtractor.shared.extractMetadata(from: track.fileURL)
-            
-            // Update in memory
-            await MainActor.run {
-                if let index = self.tracks.firstIndex(where: { $0.id == track.id }) {
-                    self.tracks[index].duration = metadata.duration
-                    if let title = metadata.title, !title.isEmpty, title != "Unknown" {
-                        self.tracks[index].title = title
-                    }
-                    if let artist = metadata.artist, !artist.isEmpty, artist != "Unknown Artist" {
-                        self.tracks[index].artist = artist
-                    }
-                    if let album = metadata.album, !album.isEmpty, album != "Unknown Album" {
-                        self.tracks[index].album = album
-                    }
-                    if let artworkData = metadata.artworkData {
-                        self.tracks[index].artworkData = artworkData
-                    }
-                    
-                    // Update in database
-                    let updatedTrack = self.tracks[index]
-                    DatabaseManager.shared.writeAsync { db in
-                        let record = TrackRecord(from: updatedTrack)
-                        try record.update(db)
-                    }
+
+            if let index = tracks.firstIndex(where: { $0.id == track.id }) {
+                tracks[index].duration = metadata.duration
+                if let title = metadata.title, !title.isEmpty, title != "Unknown" {
+                    tracks[index].title = title
+                }
+                if let artist = metadata.artist, !artist.isEmpty, artist != "Unknown Artist" {
+                    tracks[index].artist = artist
+                }
+                if let album = metadata.album, !album.isEmpty, album != "Unknown Album" {
+                    tracks[index].album = album
+                }
+                if let artworkData = metadata.artworkData {
+                    tracks[index].artworkData = artworkData
+                }
+
+                let record = TrackRecord(from: tracks[index])
+                DatabaseManager.shared.writeAsync { db in
+                    try record.update(db)
                 }
             }
         }
-        
-        // Rebuild indexes after metadata update
-        await MainActor.run {
-            self.rebuildIndexes()
-        }
+
+        rebuildIndexes()
     }
-    
+
     func updateTrackMetadata(track: Track) {
         if let index = tracks.firstIndex(where: { $0.id == track.id }) {
             tracks[index] = track
             rebuildIndexes()
-            
-            DatabaseManager.shared.writeAsync { db in
-                let record = TrackRecord(from: track)
-                try record.update(db)
-            }
-        }
-    }
-    
-    // MARK: - Track Operations
-    
-    func toggleFavorite(_ track: Track) {
-        // 1. Check if track is already in library (by ID)
-        if let index = tracks.firstIndex(where: { $0.id == track.id }) {
-            // Track Exists
-            tracks[index].isFavorite.toggle()
-            let newValue = tracks[index].isFavorite
-            
-            // Smart Download: If marking as Favorite AND it's a Remote track -> Download it
-            if newValue && tracks[index].isRemote {
-                print("[LibraryManager] Smart Favorite: Auto-downloading '\(track.title)'")
-                triggerDownload(for: tracks[index])
-            }
-            
-            // Interaction & DB Update
-            if newValue {
-                RecommendationEngine.shared.recordInteraction(for: track, type: .liked)
-            } else {
-                RecommendationEngine.shared.recordInteraction(for: track, type: .unliked)
-            }
-            
-            DatabaseManager.shared.writeAsync { db in
-                let record = TrackRecord(from: self.tracks[index])
-                try record.update(db)
-            }
-        } else {
-            // 2. Track NOT in library (e.g. from Search/Trending)
-            // Add to library, Mark Favorite, and Download
-            print("[LibraryManager] Smart Favorite: Adding & Downloading new track '\(track.title)'")
-            
-            var newTrack = track
-            newTrack.isFavorite = true
-            newTrack.dateAdded = Date()
-            
-            // Add to memory
-            tracks.append(newTrack)
-            rebuildIndexes()
-            
-            // Add to DB
-            DatabaseManager.shared.writeAsync { db in
-                try TrackRecord(from: newTrack).insert(db)
-            }
-            
-            // Trigger Download if Remote
-            if newTrack.isRemote {
-                triggerDownload(for: newTrack)
-            }
-            
-            RecommendationEngine.shared.recordInteraction(for: newTrack, type: .liked)
-        }
-    }
-    
-    private func triggerDownload(for track: Track) {
-        guard let url = track.fileURL.absoluteString.removingPercentEncoding,
-              url.starts(with: "tidal://"),
-              let idStr = track.fileURL.host,
-              let id = Int(idStr) else { return }
-        
-        // Construct Proxy TidalTrack
-        // We assume valid metadata is present in the Track object
-        let artistObj = TidalArtist(id: 0, name: track.artist)
-        let albumObj = TidalAlbum(id: 0, title: track.album, cover: nil) // We don't need cover ID for download if we have cover URL?
-        // Actually DownloadManager uses `track.coverURL` which is computed from `track.album.cover`.
-        // The `Track` object stores `artworkData` or we might fetch it?
-        // Wait, `DownloadManager` expects `TidalTrack`. `TidalTrack` computes coverURL from `album.cover` path.
-        // `Track` doesn't store the specific Tidal cover ID.
-        
-        // Let's create a partial TidalTrack.
-        // DownloadManager uses: id, title, artist.name, album.title, coverURL (optional).
-        
-        // If we don't have the cover path, we might miss the cover art in the download unless we fetch full metadata.
-        // For "Smart Favorites", speed is key. We can download audio first.
-        // OR: We can construct `TidalTrack` better if the original `Track` came from `TidalTrack` conversion.
-        // But `Track` struct loses the specific Tidal cover ID.
-        
-        let tidalTrack = TidalTrack(
-            id: id,
-            title: track.title,
-            duration: Int(track.duration),
-            artist: artistObj,
-            artists: [artistObj],
-            album: albumObj,
-            releaseDate: nil,
-            popularity: nil
-        )
-        
-        DownloadManager.shared.download(track: tidalTrack)
-    }
-    
 
-    
-    func incrementPlayCount(_ track: Track) {
-        if let index = tracks.firstIndex(where: { $0.id == track.id }) {
-            tracks[index].playCount += 1
-            tracks[index].lastPlayed = Date()
-            
-            // Update in database
+            let record = TrackRecord(from: track)
             DatabaseManager.shared.writeAsync { db in
-                let record = TrackRecord(from: self.tracks[index])
                 try record.update(db)
             }
-            
-            // Trigger UI update
-            rebuildIndexes()
         }
     }
-    
+
+    // MARK: - Track Operations
+
+    func toggleFavorite(_ track: Track) {
+        guard let index = tracks.firstIndex(where: { $0.id == track.id }) else { return }
+
+        tracks[index].isFavorite.toggle()
+        let newValue = tracks[index].isFavorite
+
+        if newValue {
+            RecommendationEngine.shared.recordInteraction(for: track, type: .liked)
+        } else {
+            RecommendationEngine.shared.recordInteraction(for: track, type: .unliked)
+        }
+
+        let record = TrackRecord(from: tracks[index])
+        DatabaseManager.shared.writeAsync { db in
+            try record.update(db)
+        }
+
+        rebuildIndexes()
+    }
+
+    func incrementPlayCount(_ track: Track) {
+        guard let index = tracks.firstIndex(where: { $0.id == track.id }) else { return }
+
+        tracks[index].playCount += 1
+        tracks[index].lastPlayed = Date()
+
+        let record = TrackRecord(from: tracks[index])
+        DatabaseManager.shared.writeAsync { db in
+            try record.update(db)
+        }
+
+        rebuildIndexes()
+    }
+
     /// Delete a track from disk, database, and memory
     func deleteTrack(_ track: Track) {
         // 1. Remove from memory immediately for instant UI feedback
         tracks.removeAll { $0.id == track.id }
         rebuildIndexes()
-        
-        // 2. Delete from database
+
+        // 2. Delete from database (and any playlist references)
+        let trackId = track.id.uuidString
         DatabaseManager.shared.writeAsync { db in
             try TrackRecord
-                .filter(Column("id") == track.id.uuidString)
+                .filter(Column("id") == trackId)
                 .deleteAll(db)
-            
-            // Also remove from any playlists
+
             try PlaylistTrackRecord
-                .filter(Column("trackId") == track.id.uuidString)
+                .filter(Column("trackId") == trackId)
                 .deleteAll(db)
         }
-        
-        // 3. Delete file from disk (only for local files)
-        if !track.isRemote {
-            let fileURL = track.fileURL
-            let accessing = fileURL.startAccessingSecurityScopedResource()
-            defer { if accessing { fileURL.stopAccessingSecurityScopedResource() } }
-            
-            do {
-                try FileManager.default.removeItem(at: fileURL)
-                print("[LibraryManager] Deleted file: \(fileURL.lastPathComponent)")
-                
-                // Also delete any sidecar files (artwork, metadata)
-                let basePath = fileURL.deletingPathExtension()
-                let sidecarExtensions = ["jpg", "png", "json"]
-                for ext in sidecarExtensions {
-                    let sidecarURL = basePath.appendingPathExtension(ext)
-                    try? FileManager.default.removeItem(at: sidecarURL)
-                }
-            } catch {
-                print("[LibraryManager] Delete file error: \(error)")
+
+        // 3. Delete file from disk
+        let fileURL = track.fileURL
+        let accessing = fileURL.startAccessingSecurityScopedResource()
+        defer { if accessing { fileURL.stopAccessingSecurityScopedResource() } }
+
+        do {
+            try FileManager.default.removeItem(at: fileURL)
+
+            // Also delete any sidecar files (artwork, lyrics, metadata)
+            let basePath = fileURL.deletingPathExtension()
+            let sidecarExtensions = ["jpg", "png", "json", "lrc", "txt"]
+            for ext in sidecarExtensions {
+                let sidecarURL = basePath.appendingPathExtension(ext)
+                try? FileManager.default.removeItem(at: sidecarURL)
             }
+        } catch {
+            print("[LibraryManager] Delete file error: \(error)")
         }
-        
-        // 4. Notify UI
-        objectWillChange.send()
     }
-    
+
     // MARK: - Favorites
-    
+
     var favorites: [Track] {
         tracks.filter { $0.isFavorite }
     }
-    
 
-    
     // MARK: - Playlist Management
-    
+
     @Published var playlists: [PlaylistRecord] = []
-    
-    func createPlaylist(name: String) {
+
+    @discardableResult
+    func createPlaylist(name: String) async -> PlaylistRecord? {
         let playlist = PlaylistRecord(name: name, isSystem: false)
-        Task {
-            do {
-                _ = try DatabaseManager.shared.write { db in
-                    try playlist.insert(db)
-                }
-                print("[LibraryManager] Created playlist: '\(name)'")
-                await loadPlaylists()
-            } catch {
-                print("[LibraryManager] Create playlist error: \(error)")
+        do {
+            _ = try DatabaseManager.shared.write { db in
+                try playlist.insert(db)
             }
+            await loadPlaylists()
+            return playlist
+        } catch {
+            print("[LibraryManager] Create playlist error: \(error)")
+            return nil
         }
     }
-    
+
     func deletePlaylist(_ playlist: PlaylistRecord) {
         guard !playlist.isSystem else { return }
         Task {
@@ -712,338 +588,82 @@ final class LibraryManager: ObservableObject {
             }
         }
     }
-    
+
     func addTrackToPlaylist(_ track: Track, playlist: PlaylistRecord) {
+        let trackRecord = TrackRecord(from: track)
+        let trackId = track.id.uuidString
+        let playlistId = playlist.id
+
         Task {
             do {
                 _ = try DatabaseManager.shared.write { db in
-                    // 1. Ensure Track exists in DB (especially for Remote tracks)
-                    // If it's a Tidal track, it might not be in our DB yet.
-                    let trackRecord = TrackRecord(from: track)
-                    // Use upsert mechanism (insert or replace)
-                    if try TrackRecord.filter(Column("id") == track.id.uuidString).fetchCount(db) == 0 {
+                    // Ensure the track exists in DB
+                    if try TrackRecord.filter(Column("id") == trackId).fetchCount(db) == 0 {
                         try trackRecord.insert(db)
                     }
-                    
-                    // 2. Check if track already exists in playlist
+
+                    // Skip if already in playlist
                     let existing = try PlaylistTrackRecord
-                        .filter(Column("playlistId") == playlist.id)
-                        .filter(Column("trackId") == track.id.uuidString)
+                        .filter(Column("playlistId") == playlistId)
+                        .filter(Column("trackId") == trackId)
                         .fetchCount(db)
-                    
-                    guard existing == 0 else {
-                        print("[LibraryManager] Track already in playlist: \(playlist.name)")
-                        return
-                    }
-                    
-                    // 3. Get max position
+
+                    guard existing == 0 else { return }
+
+                    // Append at the end
                     let count = try PlaylistTrackRecord
-                        .filter(Column("playlistId") == playlist.id)
+                        .filter(Column("playlistId") == playlistId)
                         .fetchCount(db)
-                    
+
                     let record = PlaylistTrackRecord(
-                        playlistId: playlist.id,
-                        trackId: track.id.uuidString,
+                        playlistId: playlistId,
+                        trackId: trackId,
                         position: count,
                         dateAdded: Date()
                     )
                     try record.insert(db)
-                    print("[LibraryManager] Added '\(track.title)' to playlist '\(playlist.name)'")
                 }
-                
-                // Notify UI to refresh
-                await MainActor.run {
-                    NotificationCenter.default.post(name: .playlistUpdated, object: playlist.id)
-                    // We must also refresh the main tracks list if we added a new remote track?
-                    // No, generally we only show local tracks in "Library", but playlists can have remote.
-                    // But we likely need to reload the specific playlist view.
-                    self.objectWillChange.send()
-                }
+
+                NotificationCenter.default.post(name: .playlistUpdated, object: playlistId)
+                objectWillChange.send()
             } catch {
                 print("[LibraryManager] Add to playlist error: \(error)")
             }
         }
     }
-    
+
     func removeTrackFromPlaylist(_ track: Track, playlist: PlaylistRecord) {
+        let trackId = track.id.uuidString
+        let playlistId = playlist.id
+
         Task {
             do {
                 _ = try DatabaseManager.shared.write { db in
                     try PlaylistTrackRecord
-                        .filter(Column("playlistId") == playlist.id)
-                        .filter(Column("trackId") == track.id.uuidString)
+                        .filter(Column("playlistId") == playlistId)
+                        .filter(Column("trackId") == trackId)
                         .deleteAll(db)
                 }
-                print("[LibraryManager] Removed '\(track.title)' from playlist '\(playlist.name)'")
-                
-                // Notify UI to refresh
-                await MainActor.run {
-                    NotificationCenter.default.post(name: .playlistUpdated, object: playlist.id)
-                    self.objectWillChange.send() // Force UI update for track counts
-                }
+
+                NotificationCenter.default.post(name: .playlistUpdated, object: playlistId)
+                objectWillChange.send()
             } catch {
                 print("[LibraryManager] Remove from playlist error: \(error)")
             }
         }
     }
-    
-    // MARK: - Smart Queue Recommendations
-    
-    /// Fast: Returns top tracks for the seed artist immediately
-    /// excludeTracks: List of tracks to strictly exclude (e.g. current queue + detailed history)
-    func getFastRecommendations(for seedTrack: Track, exclude: [Track] = []) async -> [Track] {
-        print("[LibraryManager] Smart Queue (Fast): Fetching Top Tracks for '\(seedTrack.artist)'")
-        do {
-            let query = seedTrack.artist
-            let results = try await TidalDLService.shared.search(query: query)
-            
-            // Build exclusion set (Titles lowercased)
-            let excludedTitles = Set(exclude.map { sanitizeString($0.title) })
-            let seedTitle = sanitizeString(seedTrack.title)
-            
-            let filtered = results.filter { candidate in
-                let candTitle = sanitizeString(candidate.title)
-                
-                // 1. Strict Self Exclusion
-                if candTitle == seedTitle { return false }
-                if candTitle.contains(seedTitle) || seedTitle.contains(candTitle) { return false }
-                
-                // 2. Queue Exclusion
-                if excludedTitles.contains(candTitle) { return false }
-                
-                return true
-            }
-            
-            // Increased to 5
-            return resolveTracks(Array(filtered.prefix(5)))
-        } catch {
-            print("[LibraryManager] Smart Queue (Fast) Error: \(error)")
-            return []
-        }
-    }
-    
-    /// Deep: Returns a mix of Track Radio (Mood/Genre) OR Similar Artists
-    func getDeepRecommendations(for seedTrack: Track, exclude: [Track] = []) async -> [Track] {
-        print("[LibraryManager] Smart Queue (Deep): Generating mix for '\(seedTrack.title)'")
-        
-        let excludedTitles = Set(exclude.map { sanitizeString($0.title) })
-        let seedTitle = sanitizeString(seedTrack.title)
-        
-        // Helper to filter and deduplicate
-        let filterCandidates: ([TidalTrack]) -> [TidalTrack] = { candidates in
-            var seen = Set<String>()
-            return candidates.filter { candidate in
-                let candTitle = self.sanitizeString(candidate.title)
-                
-                // 1. Check against Seed and Excludes
-                if candTitle == seedTitle { return false }
-                if candTitle.contains(seedTitle) || seedTitle.contains(candTitle) { return false }
-                if excludedTitles.contains(candTitle) { return false }
-                
-                // 2. Check internal duplicates (e.g. "Song" vs "Song (OST)")
-                if seen.contains(candTitle) { return false }
-                seen.insert(candTitle)
-                
-                return true
-            }
-        }
-        
-        var rawCandidates: [Track] = []
-        
-        // 1. Try Track Radio
-        if seedTrack.isRemote, let seedID = Int(seedTrack.fileURL.host ?? "") {
-             do {
-                 let radioTracks = try await TidalDLService.shared.getTrackRadio(trackID: seedID)
-                 
-                 // VARIETY CHECK:
-                 // If Track Radio is dominated by the same artist, we MUST mix in Similar Artists.
-                 let uniqueRadio = filterCandidates(radioTracks)
-                 let seedArtistNorm = sanitizeString(seedTrack.artist)
-                 
-                 let sameArtistCount = uniqueRadio.filter { sanitizeString($0.artistName) == seedArtistNorm }.count
-                 let varietyRatio = Double(sameArtistCount) / Double(max(1, uniqueRadio.count))
-                 
-                 if !radioTracks.isEmpty && varietyRatio < 0.4 {
-                     // Good Variety: Use Radio directly
-                     print("[LibraryManager] Smart Queue (Deep): Using Track Radio (Values: \(radioTracks.count), Variety: \(1.0 - varietyRatio))")
-                     rawCandidates = resolveTracks(Array(uniqueRadio.prefix(25)))
-                 } else {
-                     // Low Variety or Empty: We need to mix in Similar Artists
-                     print("[LibraryManager] Smart Queue (Deep): Track Radio too homogenous (\(Int(varietyRatio * 100))% same artist). Mixing in Similar Artists.")
-                     
-                     // Keep some radio tracks (Max 3 from seed artist)
-                     // Low Variety or Empty: We need to mix in Similar Artists
-                     print("[LibraryManager] Smart Queue (Deep): Track Radio too homogenous (\(Int(varietyRatio * 100))% same artist). Mixing in Similar Artists.")
-                     
-                     // Keep more radio tracks as backup (Max 10 from seed artist)
-                     let radioFiltered = uniqueRadio.filter { sanitizeString($0.artistName) != seedArtistNorm }
-                     let radioSame = uniqueRadio.filter { sanitizeString($0.artistName) == seedArtistNorm }.prefix(10)
-                     
-                     rawCandidates = resolveTracks(Array(radioFiltered + radioSame))
-                 }
-             } catch {
-                 print("[LibraryManager] Smart Queue (Deep): Track Radio unavailable.")
-             }
-        }
-        
-        let radioBackup = rawCandidates // Store what we found from Radio for fallback
-        
-        // 2. Similar Artists Injection (If needed)
-        // If we have < 10 candidates after Radio, or if we ignored Radio due to low variety
-        if rawCandidates.count < 15 {
-            do {
-                // Get Artist ID
-                var artistID: Int?
-                if seedTrack.isRemote, let t = try? await TidalDLService.shared.search(query: "\(seedTrack.title) \(seedTrack.artist)").first {
-                     artistID = t.artist?.id ?? t.artists?.first?.id
-                } else if let t = try? await TidalDLService.shared.search(query: seedTrack.artist).first {
-                    artistID = t.artist?.id ?? t.artists?.first?.id
-                }
-                
-                if let id = artistID {
-                    let similarArtists = try await TidalDLService.shared.getSimilarArtists(id: id)
-                    
-                    var similarCandidates: [TidalTrack] = []
-                    
-                    await withTaskGroup(of: [TidalTrack].self) { group in
-                        for artist in similarArtists.prefix(7) { 
-                             group.addTask {
-                                do {
-                                    // Fetch top tracks for this similar artist
-                                    let tracks = try await TidalDLService.shared.search(query: artist.name)
-                                    return Array(tracks.prefix(3))
-                                } catch { return [] }
-                            }
-                        }
-                        
-                        for await tracks in group {
-                            similarCandidates.append(contentsOf: tracks)
-                        }
-                    }
-                    
-                    if !similarCandidates.isEmpty {
-                         let uniqueSimilar = filterCandidates(similarCandidates)
-                         let resolvedSimilar = resolveTracks(uniqueSimilar)
-                         
-                         // Merge
-                         if rawCandidates.isEmpty {
-                             rawCandidates = resolvedSimilar
-                         } else {
-                             // Interleave / Append
-                             rawCandidates.append(contentsOf: resolvedSimilar)
-                         }
-                    } else {
-                        // Similar Artists returned empty (Maybe API issue)
-                        // If we aggressively filtered Radio earlier, RESTORE IT!
-                        if rawCandidates.count < 5, let radioTracks = try? await TidalDLService.shared.getTrackRadio(trackID: Int(seedTrack.fileURL.host ?? "") ?? 0) {
-                            print("[LibraryManager] Similar Artists failed. Restoring original Track Radio.")
-                            let unique = filterCandidates(radioTracks)
-                            rawCandidates = resolveTracks(Array(unique.prefix(25)))
-                        }
-                    }
-                }
-            } catch {
-                 print("[LibraryManager] Similar Artists fallback failed: \(error)")
-                 // Restore Backup if needed
-                 if rawCandidates.count < 5 && radioBackup.count > rawCandidates.count {
-                      rawCandidates = radioBackup
-                 }
-            }
-        }
-        
-        // 3. Final Shuffle & Recommendations
-        if !rawCandidates.isEmpty {
-            // Shuffle to mix Radio vs Similar
-            rawCandidates.shuffle()
-            
-            // Apply Recommendation Engine Ranking
-            print("[LibraryManager] Ranking \(rawCandidates.count) candidates with Recommendation Engine...")
-            // We request rank, but engine might prioritize "Liked" artists.
-            let ranked = await RecommendationEngine.shared.rank(candidates: rawCandidates)
-            
-            // 4. Final Variety Enforcer (Post-Ranking)
-            // Ensure no more than 3 songs from Seed Artist appear in total.
-            let seedArtistNorm = sanitizeString(seedTrack.artist)
-            
-            // Soft Limit: Try to limit to 4. If total < 5, allow more.
-            var seedCount = 0
-            var filtered: [Track] = []
-            
-            // First pass: Add non-seed songs and up to 4 seed songs
-            for t in ranked {
-                if sanitizeString(t.artist) == seedArtistNorm {
-                    seedCount += 1
-                    if seedCount > 4 { continue }
-                }
-                filtered.append(t)
-            }
-            
-            // Emergency Check: If we filtered too much and have < 5 songs, put them back!
-            if filtered.count < 5 {
-                let currentIDs = Set(filtered.map { $0.id })
-                for t in ranked {
-                    if !currentIDs.contains(t.id) {
-                        filtered.append(t)
-                        if filtered.count >= 10 { break }
-                    }
-                }
-            }
-            
-            return filtered
-        }
-        
-        return []
-    }
-    
-    // Deterministic UUID generation
-    private func resolveTracks(_ tidalTracks: [TidalTrack]) -> [Track] {
-        var references: [Track] = []
-        for tidalTrack in tidalTracks {
-            if let localTrack = findLocalTrack(title: tidalTrack.title, artist: tidalTrack.artistName) {
-                references.append(localTrack)
-            } else {
-                // Generate Deterministic UUID based on Tidal ID
-                // UUID from string hash is reliable for duplicates
-                let uuidString = UUID(uuidString: "00000000-0000-0000-0000-\(String(format: "%012d", tidalTrack.id))") ?? UUID()
-                
-                references.append(Track(
-                    id: uuidString,
-                    title: tidalTrack.title,
-                    artist: tidalTrack.artistName,
-                    album: tidalTrack.albumName,
-                    duration: TimeInterval(tidalTrack.duration),
-                    fileURL: URL(string: "tidal://\(tidalTrack.id)")!,
-                    artworkURL: tidalTrack.coverURL,
-                    externalID: String(tidalTrack.id)
-                ))
-            }
-        }
-        return references
-    }
-    
-    /// Helper to find local track fuzzy
-    private func findLocalTrack(title: String, artist: String) -> Track? {
-        return tracks.first { track in
-             !track.isRemote &&
-             sanitizeString(track.title) == sanitizeString(title) &&
-             sanitizeString(track.artist) == sanitizeString(artist)
-        }
-    }
-    
+
     func loadPlaylists() async {
         do {
             let records = try DatabaseManager.shared.read { db in
                 try PlaylistRecord.order(Column("name")).fetchAll(db)
             }
-            await MainActor.run {
-                self.playlists = records
-                print("[LibraryManager] Loaded \(records.count) playlists: \(records.map { $0.name })")
-            }
+            self.playlists = records
         } catch {
             print("[LibraryManager] Load playlists error: \(error)")
         }
     }
-    
+
     func getTracks(for playlist: PlaylistRecord) async -> [Track] {
         do {
             let trackIds = try DatabaseManager.shared.read { db in
@@ -1053,19 +673,17 @@ final class LibraryManager: ObservableObject {
                     .fetchAll(db)
                     .map { $0.trackId }
             }
-            
+
             // Map IDs to in-memory tracks to preserve object identity/state
-            return await MainActor.run {
-                trackIds.compactMap { id in
-                    self.tracks.first(where: { $0.id.uuidString == id })
-                }
+            return trackIds.compactMap { id in
+                tracks.first(where: { $0.id.uuidString == id })
             }
         } catch {
             print("[LibraryManager] Get playlist tracks error: \(error)")
             return []
         }
     }
-    
+
     func getTrackCount(for playlist: PlaylistRecord) -> Int {
         do {
             return try DatabaseManager.shared.read { db in
@@ -1077,7 +695,7 @@ final class LibraryManager: ObservableObject {
             return 0
         }
     }
-    
+
     /// Check which playlists a track belongs to
     func getPlaylistIds(for track: Track) -> Set<String> {
         do {
@@ -1093,215 +711,162 @@ final class LibraryManager: ObservableObject {
             return []
         }
     }
-    
-    // MARK: - Trending / Top Songs
-    
-    @Published var topSongs: [TidalTrack] = []
-    @Published var isLoadingTopSongs = false
-    
-    // Explicitly for India
-    @Published var trendingIndiaSongs: [TidalTrack] = []
-    
-    private var cacheDirectory: URL {
-        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-    }
-    
-    private var topSongsCacheURL: URL {
-        cacheDirectory.appendingPathComponent("top_songs_world.json")
-    }
-    
-    private var trendingIndiaCacheURL: URL {
-        cacheDirectory.appendingPathComponent("trending_india.json")
-    }
-    
-    func loadInitialTrendingCache() {
-        // Load cached data immediately on app launch
-        if let cachedWorld = loadTrendingCache(url: topSongsCacheURL) {
-            self.topSongs = cachedWorld
-        }
-        
-        if let cachedIndia = loadTrendingCache(url: trendingIndiaCacheURL) {
-            self.trendingIndiaSongs = cachedIndia
-        }
-        
-        // Trigger background refresh
-        Task {
-            await fetchTopSongs()
-            await fetchTrendingIndia()
-        }
-    }
-    
-    func fetchTopSongs() async {
-        if topSongs.isEmpty { isLoadingTopSongs = true }
-        
-        // 1. Fetch High-Quality curated list from iTunes RSS
-        let countryCode = Locale.current.region?.identifier ?? "us"
-        let iTunesSongs = await fetchITunesTrends(country: countryCode)
-        
-        // 2. Resolve to Tidal Tracks in parallel
-        let resolvedTracks = await resolveToTidal(iTunesSongs)
-        
-        await MainActor.run {
-            if !resolvedTracks.isEmpty {
-                self.topSongs = resolvedTracks
+
+    // MARK: - External Files (opened via Finder / "Open With")
+
+    /// Plays audio files opened from outside the app. Files already in the
+    /// library play as their library tracks; others play as one-off tracks
+    /// with metadata read from the file.
+    func playExternalFiles(_ urls: [URL]) async {
+        var queueTracks: [Track] = []
+
+        for url in urls {
+            // Prefer the library's copy so favorites/play counts keep working
+            if let existing = tracks.first(where: { $0.fileURL.path == url.path }) {
+                queueTracks.append(existing)
+                continue
             }
-            self.isLoadingTopSongs = false
+
+            let metadata = await MetadataExtractor.shared.extractMetadata(from: url)
+            var track = metadata.toTrack()
+            track.fileURL = url
+            queueTracks.append(track)
         }
+
+        guard !queueTracks.isEmpty else { return }
+        PlaybackManager.shared.playQueue(tracks: queueTracks)
     }
-    
-    func fetchTrendingIndia() async {
-        // 1. Fetch India Trends
-        let iTunesSongs = await fetchITunesTrends(country: "in")
-        
-        // 2. Resolve to Tidal
-        let resolvedTracks = await resolveToTidal(iTunesSongs)
-        
-        await MainActor.run {
-            if !resolvedTracks.isEmpty {
-                self.trendingIndiaSongs = resolvedTracks
-            }
+
+    // MARK: - Local Recommendations (Smart Queue / Radio)
+
+    /// Returns similar tracks from the local library, ranked by artist/album
+    /// affinity and the user's taste profile. Fully offline.
+    func getLocalRecommendations(for seed: Track, excluding: [Track], limit: Int) -> [Track] {
+        guard limit > 0 else { return [] }
+
+        var excludedIds = Set(excluding.map { $0.id })
+        excludedIds.insert(seed.id)
+
+        let seedArtist = sanitizeString(seed.artist)
+        let seedAlbum = seed.album.lowercased()
+        let seedTitle = sanitizeString(seed.title)
+
+        // Signatures already queued (avoids "Song" vs "Song (Remastered)" dupes)
+        var seenSignatures = Set(excluding.map { sanitizeString($0.title + $0.artist) })
+        seenSignatures.insert(sanitizeString(seed.title + seed.artist))
+
+        struct Candidate {
+            let track: Track
+            let score: Double
+            let sameArtist: Bool
         }
-    }
-    
-    // MARK: - Hybrid Resolution Logic
-    
-    private func fetchITunesTrends(country: String) async -> [ITunesSimpleSong] {
-        let urlString = "https://itunes.apple.com/\(country)/rss/topsongs/limit=15/json" // Fetch top 15
-        guard let url = URL(string: urlString) else { return [] }
-        
-        do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            let feed = try JSONDecoder().decode(ITunesFeedRoot.self, from: data)
-            return feed.feed.entry.map {
-                ITunesSimpleSong(title: $0.title.label, artist: $0.artist.label)
-            }
-        } catch {
-            print("[LibraryManager] iTunes RSS Error: \(error)")
-            return []
+
+        var candidates: [Candidate] = []
+        for track in tracks {
+            guard !excludedIds.contains(track.id) else { continue }
+
+            let title = sanitizeString(track.title)
+            // Skip alternate versions of the seed itself
+            if title == seedTitle { continue }
+
+            let signature = sanitizeString(track.title + track.artist)
+            guard !seenSignatures.contains(signature) else { continue }
+            seenSignatures.insert(signature)
+
+            let artist = sanitizeString(track.artist)
+            let sameArtist = !artist.isEmpty && artist == seedArtist
+
+            var score = RecommendationEngine.shared.affinity(forArtist: track.artist)
+            if sameArtist { score += 4 }
+            if track.album.lowercased() == seedAlbum && !seedAlbum.isEmpty { score += 2 }
+            if track.isFavorite { score += 2 }
+            score += min(Double(track.playCount), 5) * 0.4
+            score += Double.random(in: 0...2) // variety
+
+            candidates.append(Candidate(track: track, score: score, sameArtist: sameArtist))
         }
-    }
-    
-    private func resolveToTidal(_ songs: [ITunesSimpleSong]) async -> [TidalTrack] {
-        await withTaskGroup(of: TidalTrack?.self) { group in
-            for song in songs {
-                group.addTask {
-                    let query = "\(song.title) \(song.artist)"
-                    do {
-                        let results = try await TidalDLService.shared.search(query: query)
-                        // Heuristic: Try to find exact match
-                        return results.first
-                    } catch {
-                        return nil
-                    }
+
+        candidates.sort { $0.score > $1.score }
+
+        // Variety cap: at most half the picks from the seed artist,
+        // unless there's nothing else to pick from.
+        let maxSameArtist = max(2, limit / 2)
+        var sameArtistCount = 0
+        var picks: [Track] = []
+        var overflow: [Track] = []
+
+        for candidate in candidates {
+            if picks.count >= limit { break }
+            if candidate.sameArtist {
+                if sameArtistCount < maxSameArtist {
+                    sameArtistCount += 1
+                    picks.append(candidate.track)
+                } else {
+                    overflow.append(candidate.track)
                 }
-            }
-            
-            var resolved: [TidalTrack] = []
-            for await track in group {
-                if let track = track {
-                    resolved.append(track)
-                }
-            }
-            // Sort by relevance? Hard since async returns largely random order. 
-            // Ideally we'd map indices but for "Trending" a bit of shuffle is fine.
-            return resolved
-        }
-    }
-    
-    // Removed legacy iTunes fetch methods
-    
-    // MARK: - Caching Helpers
-    
-    // MARK: - Caching Helpers
-    
-    // Updated to cache TidalTrack instead of ITunesSong
-    private func saveTrendingCache(_ songs: [TidalTrack], url: URL) {
-        Task.detached(priority: .background) {
-            do {
-                let data = try JSONEncoder().encode(songs)
-                try data.write(to: url)
-            } catch {
-                print("[LibraryManager] Cache save error: \(error)")
+            } else {
+                picks.append(candidate.track)
             }
         }
-    }
-    
-    private func loadTrendingCache(url: URL) -> [TidalTrack]? {
-        do {
-            let data = try Data(contentsOf: url)
-            let songs = try JSONDecoder().decode([TidalTrack].self, from: data)
-            return songs
-        } catch {
-            return nil
+
+        // Backfill from overflow if the library lacks variety
+        if picks.count < limit {
+            picks.append(contentsOf: overflow.prefix(limit - picks.count))
         }
+
+        return picks
     }
-    
+
+    nonisolated private func sanitizeString(_ str: String) -> String {
+        var s = str.lowercased()
+
+        // Remove parenthesized/bracketed qualifiers: "Song (Remastered)" -> "Song"
+        s = s.replacingOccurrences(of: "\\(.*?\\)", with: "", options: .regularExpression)
+        s = s.replacingOccurrences(of: "\\[.*?\\]", with: "", options: .regularExpression)
+
+        // Remove common suffixes
+        s = s.replacingOccurrences(of: " feat\\..*", with: "", options: .regularExpression)
+        s = s.replacingOccurrences(of: " from .*", with: "", options: .regularExpression)
+        s = s.replacingOccurrences(of: " remix.*", with: "", options: .regularExpression)
+        s = s.replacingOccurrences(of: " version.*", with: "", options: .regularExpression)
+
+        let alphanum = s.filter { $0.isLetter || $0.isNumber }
+        return alphanum.isEmpty ? s.trimmingCharacters(in: .whitespacesAndNewlines) : alphanum
+    }
+
     // MARK: - Indexes
-    
+
     private func rebuildIndexes() {
         albums.removeAll()
         artists.removeAll()
-        
+
         for track in tracks {
             albums[track.album, default: []].append(track)
             artists[track.artist, default: []].append(track)
         }
-        
+
         // Update derived collections
         recentlyAddedSongs = Array(tracks.sorted { $0.dateAdded > $1.dateAdded }.prefix(25))
-        
-        // Most Listened - Played songs first, then fill with others to reach 20
-        let played = tracks.filter { $0.playCount > 0 }
-            .sorted { $0.playCount > $1.playCount }
-        
-        // If we have fewer than 20 played songs, fill with unplayed ones (A-Z)
-        if played.count < 20 {
-            let needed = 20 - played.count
-            let unplayed = tracks.filter { $0.playCount == 0 }
-                .sorted { $0.title < $1.title }
-                .prefix(needed)
-            mostListenedSongs = played + Array(unplayed)
-        } else {
-            mostListenedSongs = Array(played.prefix(20))
-        }
-        
+
+        // Most Listened - only tracks that were actually played
+        mostListenedSongs = Array(
+            tracks.filter { $0.playCount > 0 }
+                .sorted { $0.playCount > $1.playCount }
+                .prefix(20)
+        )
+
         // Recently Played
-        recentlyPlayedSongs = Array(tracks.filter { $0.lastPlayed != nil }
-            .sorted { $0.lastPlayed! > $1.lastPlayed! }
-            .prefix(25))
+        recentlyPlayedSongs = Array(
+            tracks.compactMap { track -> (Track, Date)? in
+                guard let lastPlayed = track.lastPlayed else { return nil }
+                return (track, lastPlayed)
+            }
+            .sorted { $0.1 > $1.1 }
+            .prefix(25)
+            .map { $0.0 }
+        )
     }
 }
-
-// MARK: - Private Helper Structs for Hybrid Fetching
-
-struct ITunesSimpleSong {
-    let title: String
-    let artist: String
-}
-
-private struct ITunesFeedRoot: Codable {
-    let feed: ITunesFeed
-}
-
-private struct ITunesFeed: Codable {
-    let entry: [ITunesEntry]
-}
-
-private struct ITunesEntry: Codable {
-    let title: ITunesLabel
-    let artist: ITunesLabel
-    
-    enum CodingKeys: String, CodingKey {
-        case title = "im:name"
-        case artist = "im:artist"
-    }
-}
-
-private struct ITunesLabel: Codable {
-    let label: String
-}
-
-
 
 // MARK: - Recommendation Engine
 
@@ -1313,18 +878,18 @@ enum UserInteractionType {
     case skippedEarly     // < 30s
 }
 
-/// A local "Lightweight" ML Engine that ranks tracks based on User Affinity.
-class RecommendationEngine {
+/// A lightweight local engine that tracks artist affinity from listening behavior.
+final class RecommendationEngine {
     static let shared = RecommendationEngine()
-    
+
     struct TasteProfile: Codable {
         /// Artist Name -> Affinity Score (Higher is better)
         var artistScores: [String: Double] = [:]
     }
-    
+
     private var profile: TasteProfile
     private let queue = DispatchQueue(label: "com.sangeet.recommendation", qos: .background)
-    
+
     private init() {
         if let data = UserDefaults.standard.data(forKey: "userTasteProfile"),
            let decoded = try? JSONDecoder().decode(TasteProfile.self, from: data) {
@@ -1333,27 +898,24 @@ class RecommendationEngine {
             self.profile = TasteProfile()
         }
     }
-    
+
     func recordInteraction(for track: Track, type: UserInteractionType) {
         queue.async {
             self.updateScore(for: track.artist, type: type)
             self.saveProfile()
         }
     }
-    
-    func rank(candidates: [Track]) async -> [Track] {
-        let currentProfile = self.profile
-        return candidates.sorted { trackA, trackB in
-            let scoreA = self.calculateScore(for: trackA, profile: currentProfile)
-            let scoreB = self.calculateScore(for: trackB, profile: currentProfile)
-            return scoreA > scoreB
-        }
+
+    /// Current affinity score for an artist (0 if unknown).
+    func affinity(forArtist artist: String) -> Double {
+        let key = artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return queue.sync { profile.artistScores[key] ?? 0.0 }
     }
-    
+
     private func updateScore(for artist: String, type: UserInteractionType) {
         let key = artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         var current = profile.artistScores[key] ?? 0.0
-        
+
         switch type {
         case .liked: current += 5.0
         case .unliked: current -= 5.0
@@ -1361,19 +923,11 @@ class RecommendationEngine {
         case .skippedImmediate: current -= 3.0
         case .skippedEarly: current -= 1.0
         }
-        
+
         current = max(-20.0, min(50.0, current))
         profile.artistScores[key] = current
-        print("[RecommendationEngine] Updated score for '\(artist)': \(current)")
     }
-    
-    private func calculateScore(for track: Track, profile: TasteProfile) -> Double {
-        let key = track.artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let affinity = profile.artistScores[key] ?? 0.0
-        let noise = Double.random(in: 0...0.1)
-        return affinity + noise
-    }
-    
+
     private func saveProfile() {
         if let encoded = try? JSONEncoder().encode(profile) {
             UserDefaults.standard.set(encoded, forKey: "userTasteProfile")

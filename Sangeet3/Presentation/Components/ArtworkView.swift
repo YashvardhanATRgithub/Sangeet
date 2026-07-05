@@ -35,12 +35,6 @@ struct ArtworkView: View {
                     Image(nsImage: artwork)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                } else if let url = track?.artworkURL {
-                    AsyncImage(url: url) { image in
-                        image.resizable().aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        placeholderView
-                    }
                 } else {
                     placeholderView
                 }
@@ -135,21 +129,7 @@ class ArtworkLoader: ObservableObject {
             self.artwork = image
             return
         }
-        
-        // Load from remote artwork URL (for online tracks)
-        if let artworkURL = track.artworkURL {
-            do {
-                let (data, _) = try await URLSession.shared.data(from: artworkURL)
-                if let image = NSImage(data: data) {
-                    await ArtworkCache.shared.set(image, for: track.id)
-                    self.artwork = image
-                    return
-                }
-            } catch {
-                print("[ArtworkLoader] Failed to load from URL: \(error)")
-            }
-        }
-        
+
         // Extract from file
         let accessing = track.fileURL.startAccessingSecurityScopedResource()
         defer { if accessing { track.fileURL.stopAccessingSecurityScopedResource() } }
